@@ -258,7 +258,7 @@ function registerConfigHandlers(mainWindow) {
         try {
             const reqOptions = {
                 hostname: 'api.github.com',
-                path: '/repos/ganjamonsta/ganjacraft_launcher/releases?per_page=15',
+                path: '/repos/OptimusHigh/ganjacraft_launcher/releases?per_page=15',
                 method: 'GET',
                 timeout: 4000,
                 headers: {
