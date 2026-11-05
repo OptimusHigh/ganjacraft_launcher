@@ -10,14 +10,16 @@ const { Client } = require('minecraft-launcher-core');
 const { downloadFile, syncFiles, downloadWithRetry } = require('../../modules/updater');
 const { authenticateYggdrasil } = require('../../modules/auth');
 const { checkAndDownloadJava, getJavaVersionInfo, REQUIRED_JAVA_MAJOR, preferJavaw, resolveJavaPath } = require('../../modules/java');
-const { loadConfig, saveConfig } = require('../../modules/config');
+const { loadConfig, saveConfig, getProfileConfig } = require('../../modules/config');
 const { cleanZeroByteFiles, isZipIntact } = require('./integrity');
 const { ensureVanillaVersionFiles, preflightNeoForgeLibraries, ensureNeoForgeVersionJsonMerged, ensureAssetIndex, parseNeoForgeJvmArgs, verifyNeoForgeLibraries } = require('./neoforge');
-const { 
+const {
     CLIENT_VERSION,
+    getBuildProfile,
     NEOFORGE_VERSION,
     MC_VERSION,
     MANIFEST_URL,
+    getNeoForgeInstallerUrl,
     NEOFORGE_INSTALLER_URL,
     AUTHLIB_INJECTOR_URL,
     YGGDRASIL_AUTH_URL,
@@ -97,13 +99,13 @@ function safeSenderSend(sender, channel, ...args) {
     }
 }
 
-MCLCHandler.prototype.downloadAsync = async function(url, directory, name, retry, type) {
+MCLCHandler.prototype.downloadAsync = async function (url, directory, name, retry, type) {
     if (isLaunchCancelled) {
         throw new Error('CANCELLED');
     }
     const fallbackUrl = getMirrorFallbackUrl(url);
     const filePath = path.join(directory, name);
-    
+
     // Try original URL first
     let result = false;
     try {
@@ -112,7 +114,7 @@ MCLCHandler.prototype.downloadAsync = async function(url, directory, name, retry
         this.client.emit('debug', `[MCLC]: Download error for ${url}: ${e.message}`);
         result = false;
     }
-    
+
     if (isLaunchCancelled) {
         throw new Error('CANCELLED');
     }
@@ -134,12 +136,12 @@ MCLCHandler.prototype.downloadAsync = async function(url, directory, name, retry
         }
 
         if (isInvalid) {
-            try { fs.unlinkSync(filePath); } catch {}
+            try { fs.unlinkSync(filePath); } catch { }
             this.client.emit('debug', `[MCLC]: Cleaned up invalid/corrupted download: ${name}`);
             result = false;
         }
     }
-    
+
     // MCLC resolves with `false` on 404/invalid, or `undefined` on error
     if (!result && fallbackUrl) {
         if (isLaunchCancelled) throw new Error('CANCELLED');
@@ -152,7 +154,7 @@ MCLCHandler.prototype.downloadAsync = async function(url, directory, name, retry
             this.client.emit('debug', `[MCLC]: Mirror download error for ${fallbackUrl}: ${e.message}`);
             mirrorResult = false;
         }
-        
+
         if (isLaunchCancelled) throw new Error('CANCELLED');
 
         // Clean up invalid file from mirror failure too
@@ -172,19 +174,19 @@ MCLCHandler.prototype.downloadAsync = async function(url, directory, name, retry
             }
 
             if (isInvalid) {
-                try { fs.unlinkSync(filePath); } catch {}
+                try { fs.unlinkSync(filePath); } catch { }
                 this.client.emit('debug', `[MCLC]: Cleaned up invalid/corrupted mirror download: ${name}`);
             }
         }
         return mirrorResult;
     }
-    
+
     return result;
 };
 
 // Monkey-patch MCLC startMinecraft to capture and cancel process spawning
 const originalStartMinecraft = Client.prototype.startMinecraft;
-Client.prototype.startMinecraft = function(launchArguments) {
+Client.prototype.startMinecraft = function (launchArguments) {
     if (isLaunchCancelled) {
         this.emit('debug', '[MCLC]: Launch was cancelled before startMinecraft, aborting process spawn.');
         const err = new Error('CANCELLED');
@@ -227,7 +229,7 @@ function cancelLaunch() {
     if (launchAbortController) {
         try {
             launchAbortController.abort();
-        } catch {}
+        } catch { }
     }
 
     // 2. Убийство активных вспомогательных подпроцессов (установщик Forge, распаковка Java и др.)
@@ -383,7 +385,7 @@ function startModWatcher(rootPath, config, gameProc, sendLog) {
                 }
                 try {
                     gameProc.kill('SIGKILL');
-                } catch {}
+                } catch { }
             }
         }
     };
@@ -413,7 +415,7 @@ function stopModWatcher() {
     if (activeModWatcher) {
         try {
             activeModWatcher.close();
-        } catch {}
+        } catch { }
         activeModWatcher = null;
     }
 }
@@ -424,23 +426,26 @@ const CURRENT_MODS_DEFAULTS_VERSION = 2;
  * Применить дефолтные настройки модов для свежих установок
  */
 async function applyDefaultModSettings(config, rootPath, sendLog, sendDebug, options = {}) {
+    const profile = options.profile || getBuildProfile(config.activeProfileId);
     if (config.modsDefaultsApplied === true && config.modsDefaultsVersion === CURRENT_MODS_DEFAULTS_VERSION) return config;
     const signal = options.signal;
     if (signal && signal.aborted) throw new Error('CANCELLED');
-    
+
     sendLog('[SETUP] Применяю дефолтные настройки модов...');
     try {
         const manifestPath = path.join(rootPath, 'manifest.json');
-        await downloadWithRetry(MANIFEST_URL, manifestPath, { timeoutMs: 15_000, signal });
+        const manifestUrl = `${BASE_URL}/files/${profile.manifestPath}`;
+        await downloadWithRetry(manifestUrl, manifestPath, { timeoutMs: 15_000, signal });
         if (signal && signal.aborted) throw new Error('CANCELLED');
         const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
         const defaults = computeDefaultDisabledModsFromManifest(manifest);
 
-        const existing = Array.isArray(config.disabledMods) ? config.disabledMods : [];
+        const profileConfig = getProfileConfig(config, profile.id);
+        const existing = Array.isArray(profileConfig.disabledMods) ? profileConfig.disabledMods : [];
         const merged = Array.from(new Set([...existing, ...defaults]));
-        config.disabledMods = merged;
-        config.modsDefaultsApplied = true;
-        config.modsDefaultsVersion = CURRENT_MODS_DEFAULTS_VERSION;
+        config.profiles[profile.id].disabledMods = merged;
+        config.profiles[profile.id].modsDefaultsApplied = true;
+        config.profiles[profile.id].modsDefaultsVersion = CURRENT_MODS_DEFAULTS_VERSION;
         saveConfig(config);
 
         if (defaults.length > 0) {
@@ -453,7 +458,7 @@ async function applyDefaultModSettings(config, rootPath, sendLog, sendDebug, opt
         sendLog('[SETUP] Не удалось применить дефолтные моды (продолжаю запуск).');
         sendDebug(`Default mods apply failed: ${e.stack || e.message}`);
     }
-    
+
     return config;
 }
 
@@ -462,10 +467,12 @@ async function applyDefaultModSettings(config, rootPath, sendLog, sendDebug, opt
  */
 async function prepareJava(config, rootPath, sendLog, sendDebug, options = {}) {
     const signal = options.signal;
+    const requiredJavaMajor = options.javaMajor || REQUIRED_JAVA_MAJOR;
+    const minecraftVersion = options.minecraftVersion || MC_VERSION;
     if (signal && signal.aborted) throw new Error('CANCELLED');
 
     let javaPath = config.javaPath ? resolveJavaPath(config.javaPath) : null;
-    
+
     if (javaPath) {
         sendDebug(`Using custom Java path: ${javaPath}`);
         if (!fs.existsSync(javaPath)) {
@@ -474,13 +481,13 @@ async function prepareJava(config, rootPath, sendLog, sendDebug, options = {}) {
 
         // Verify Java version (Forge 1.20.1 requires Java 17+)
         const info = await getJavaVersionInfo(javaPath);
-        if (!info || info.major < REQUIRED_JAVA_MAJOR) {
+        if (!info || info.major < requiredJavaMajor) {
             throw new Error(
-                `У вас указана неподходящая Java (нужна Java ${REQUIRED_JAVA_MAJOR}+ для Minecraft ${MC_VERSION}).\n\n` +
+                `У вас указана неподходящая Java (нужна Java ${requiredJavaMajor}+ для Minecraft ${minecraftVersion}).\n\n` +
                 `Решение:\n` +
-                `1) Откройте настройки лаунчера и очистите поле "Java" (оставьте пустым) — лаунчер сам скачает JRE ${REQUIRED_JAVA_MAJOR}.\n` +
+                `1) Откройте настройки лаунчера и очистите поле "Java" (оставьте пустым) — лаунчер сам скачает JRE ${requiredJavaMajor}.\n` +
                 `или\n` +
-                `2) Укажите путь к java.exe из Java ${REQUIRED_JAVA_MAJOR}+.\n\n` +
+                `2) Укажите путь к java.exe из Java ${requiredJavaMajor}+.\n\n` +
                 `Текущая Java: ${info?.major || 'не удалось определить'}`
             );
         }
@@ -503,7 +510,7 @@ async function prepareJava(config, rootPath, sendLog, sendDebug, options = {}) {
             javaPath = preferredPath;
         }
     }
-    
+
     return javaPath;
 }
 
@@ -512,34 +519,36 @@ async function prepareJava(config, rootPath, sendLog, sendDebug, options = {}) {
  */
 async function prepareForge(rootPath, sendLog, sendDebug, options = {}) {
     const signal = options.signal;
+    const neoforgeVersion = options.neoforgeVersion || NEOFORGE_VERSION;
+    const installerUrl = options.installerUrl || getNeoForgeInstallerUrl(neoforgeVersion);
     if (signal && signal.aborted) throw new Error('CANCELLED');
 
-    const forgeInstallerPath = path.join(rootPath, `neoforge-${NEOFORGE_VERSION}-installer.jar`);
+    const forgeInstallerPath = path.join(rootPath, `neoforge-${neoforgeVersion}-installer.jar`);
     let needForge = !fs.existsSync(forgeInstallerPath);
-    
+
     if (!needForge) {
         const size = fs.statSync(forgeInstallerPath).size;
         if (size === 0 || !(await isZipIntact(forgeInstallerPath))) {
             sendLog('Обнаружен поврежденный установщик Forge (битый/не ZIP). Перекачивание...');
-            try { fs.unlinkSync(forgeInstallerPath); } catch {}
+            try { fs.unlinkSync(forgeInstallerPath); } catch { }
             needForge = true;
         }
     }
 
     if (needForge) {
         sendLog('Скачивание установщика Forge...');
-        sendDebug(`Downloading Forge from ${NEOFORGE_INSTALLER_URL}`);
-        await downloadWithRetry(NEOFORGE_INSTALLER_URL, forgeInstallerPath, { timeoutMs: 120_000, signal });
+        sendDebug(`Downloading NeoForge from ${installerUrl}`);
+        await downloadWithRetry(installerUrl, forgeInstallerPath, { timeoutMs: 120_000, signal });
         if (signal && signal.aborted) throw new Error('CANCELLED');
         if (!(await isZipIntact(forgeInstallerPath))) {
-            try { fs.unlinkSync(forgeInstallerPath); } catch {}
+            try { fs.unlinkSync(forgeInstallerPath); } catch { }
             throw new Error('Downloaded Forge installer is not a valid JAR/ZIP (truncated or HTML response)');
         }
         sendLog('Установщик Forge скачан.');
     } else {
         sendLog('Установщик Forge найден.');
     }
-    
+
     return forgeInstallerPath;
 }
 
@@ -551,19 +560,19 @@ async function prepareAuthlib(rootPath, sendLog, sendDebug, options = {}) {
     if (signal && signal.aborted) throw new Error('CANCELLED');
 
     const authlibPath = path.join(rootPath, 'authlib-injector.jar');
-    
+
     if (!fs.existsSync(authlibPath) || !(await isZipIntact(authlibPath))) {
         sendLog('Скачивание Authlib Injector...');
         sendDebug(`Downloading Authlib from ${AUTHLIB_INJECTOR_URL}`);
         await downloadFile(AUTHLIB_INJECTOR_URL, authlibPath, { timeoutMs: 60_000, signal });
         if (signal && signal.aborted) throw new Error('CANCELLED');
         if (!(await isZipIntact(authlibPath))) {
-            try { fs.unlinkSync(authlibPath); } catch {}
+            try { fs.unlinkSync(authlibPath); } catch { }
             throw new Error('Downloaded authlib-injector is not a valid JAR/ZIP');
         }
         sendLog('Authlib Injector скачан.');
     }
-    
+
     return authlibPath;
 }
 
@@ -641,12 +650,15 @@ function ensureRequiredResourcePacks(rootPath, sendLog, sendDebug) {
  * Синхронизация модов
  */
 async function syncMods(event, rootPath, config, sendLog, sendDebug, options = {}) {
+    const profile = options.profile || getBuildProfile(config.activeProfileId);
+    const manifestUrl = `${require('../constants').FILES_BASE}/${profile.manifestPath}`;
+    const profileConfig = getProfileConfig(config, profile.id);
     const onSyncProgress = (p) => {
         safeSenderSend(event.sender, 'progress', p);
     };
-    
+
     sendDebug('Starting syncFiles...');
-    await syncFiles(rootPath, MANIFEST_URL, sendLog, onSyncProgress, config.disabledMods, () => isLaunchCancelled, options);
+    await syncFiles(rootPath, manifestUrl, sendLog, onSyncProgress, profileConfig.disabledMods, () => isLaunchCancelled, options);
     sendDebug('syncFiles completed.');
 
     // Copy custom client configs from client_config/ to config/ if present
@@ -667,12 +679,65 @@ async function syncMods(event, rootPath, config, sendLog, sendDebug, options = {
 }
 
 /**
- * Построить опции для MCLC
+ * Подготовить Fabric version metadata для MCLC.
  */
-function buildLaunchOptions(config, rootPath, javaPath, forgeInstallerPath, authlibPath, authSession, authlibPrefetched) {
+async function ensureFabricVersionJson(rootPath, sendLog, sendDebug, options = {}) {
+    const signal = options.signal;
+    const minecraftVersion = options.minecraftVersion;
+    const loaderVersion = options.fabricLoaderVersion;
+    const versionId = `fabric-loader-${loaderVersion}-${minecraftVersion}`;
+    const versionDir = path.join(rootPath, 'versions', versionId);
+    const versionJsonPath = path.join(versionDir, `${versionId}.json`);
+    const metadataUrl = `https://meta.fabricmc.net/v2/versions/loader/${encodeURIComponent(minecraftVersion)}/${encodeURIComponent(loaderVersion)}/profile/json`;
+
+    if (signal?.aborted) throw new Error('CANCELLED');
+
+    let versionJson = null;
+    if (fs.existsSync(versionJsonPath)) {
+        try {
+            const existing = JSON.parse(fs.readFileSync(versionJsonPath, 'utf8'));
+            if (existing?.id === versionId && existing.inheritsFrom === minecraftVersion && Array.isArray(existing.libraries)) {
+                versionJson = existing;
+            }
+        } catch { }
+    }
+
+    if (!versionJson) {
+        sendLog(`Загрузка metadata Fabric Loader ${loaderVersion} для Minecraft ${minecraftVersion}...`);
+        const response = await fetch(metadataUrl, { signal });
+        if (!response.ok) throw new Error(`Fabric metadata вернул HTTP ${response.status}`);
+        const metadata = await response.json();
+        if (signal?.aborted) throw new Error('CANCELLED');
+        if (!metadata || metadata.id !== versionId || metadata.inheritsFrom !== minecraftVersion || !Array.isArray(metadata.libraries)) {
+            throw new Error(`Fabric metadata для ${versionId} имеет неожиданный формат`);
+        }
+
+        fs.mkdirSync(versionDir, { recursive: true });
+        const tempPath = `${versionJsonPath}.tmp`;
+        try {
+            fs.writeFileSync(tempPath, JSON.stringify(metadata, null, 2), 'utf8');
+            fs.renameSync(tempPath, versionJsonPath);
+        } catch (error) {
+            try { if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath); } catch { }
+            throw error;
+        }
+        versionJson = metadata;
+        sendLog(`Fabric Loader ${loaderVersion} подготовлен.`);
+    } else {
+        sendDebug(`Fabric version metadata is valid: ${versionId}`);
+    }
+
+    return { versionId, versionJsonPath, versionJson };
+}
+
+function buildLaunchOptions(config, rootPath, javaPath, forgeInstallerPath, authlibPath, authSession, authlibPrefetched, profile) {
+    const isNeoForge = profile.loader === 'neoforge';
     // Read NeoForge JVM args directly from version.json
-    const parsedJvmArgs = parseNeoForgeJvmArgs(rootPath);
-    
+    const parsedJvmArgs = isNeoForge ? parseNeoForgeJvmArgs(rootPath, {
+        minecraftVersion: profile.minecraftVersion,
+        neoforgeVersion: profile.neoforgeVersion,
+    }) : [];
+
     let neoforgeModuleArgs;
     if (parsedJvmArgs) {
         // Parsed from version.json — exact paths, no guessing
@@ -693,8 +758,8 @@ function buildLaunchOptions(config, rootPath, javaPath, forgeInstallerPath, auth
         customArgs.unshift(`-javaagent:${authlibPath}=${BASE_URL}/api/yggdrasil`);
     }
 
-    const neoforgeVerId = `neoforge-${NEOFORGE_VERSION}`;
-    const neoforgeJsonPath = path.join(rootPath, 'versions', neoforgeVerId, `${neoforgeVerId}.json`);
+    const versionId = isNeoForge ? `neoforge-${profile.neoforgeVersion || NEOFORGE_VERSION}` : profile.loader === 'fabric' ? `fabric-loader-${profile.fabricLoaderVersion}-${profile.minecraftVersion}` : profile.minecraftVersion;
+    const versionJsonPath = path.join(rootPath, 'versions', versionId, `${versionId}.json`);
 
     const nativesDir = path.join(rootPath, 'natives');
     if (!fs.existsSync(nativesDir)) fs.mkdirSync(nativesDir, { recursive: true });
@@ -714,16 +779,17 @@ function buildLaunchOptions(config, rootPath, javaPath, forgeInstallerPath, auth
             user_properties: "{}"
         },
         root: rootPath,
-        quickConnect: {
-            host: "vocalize-cove.gl.joinmc.link"
-        },
+        quickPlay: profile.serverHost ? {
+            type: 'legacy',
+            identifier: `${profile.serverHost}:${profile.serverPort}`,
+        } : undefined,
         timeout: 180_000,
         version: {
-            number: MC_VERSION,
+            number: profile.minecraftVersion,
             type: "release",
-            custom: neoforgeVerId
+            custom: versionId
         },
-        forge: null,
+        forge: isNeoForge ? null : undefined,
         memory: {
             max: config.memoryMax,
             min: config.memoryMin
@@ -731,10 +797,18 @@ function buildLaunchOptions(config, rootPath, javaPath, forgeInstallerPath, auth
         javaPath: javaPath || undefined,
         overrides: {
             maxSockets: 8,
+            assetIndex: (() => {
+                try {
+                    const vanillaJsonPath = path.join(rootPath, 'versions', profile.minecraftVersion, `${profile.minecraftVersion}.json`);
+                    return JSON.parse(fs.readFileSync(vanillaJsonPath, 'utf8')).assetIndex?.id || profile.minecraftVersion;
+                } catch {
+                    return profile.minecraftVersion;
+                }
+            })(),
             minArgs: 1,
-            versionJson: neoforgeJsonPath,
+            versionJson: versionJsonPath,
             natives: nativesDir,
-            minecraftJar: path.join(rootPath, 'versions', MC_VERSION, `${MC_VERSION}.jar`),
+            minecraftJar: path.join(rootPath, 'versions', profile.minecraftVersion, `${profile.minecraftVersion}.jar`),
         },
         customArgs: customArgs
     };
@@ -743,31 +817,33 @@ function buildLaunchOptions(config, rootPath, javaPath, forgeInstallerPath, auth
 /**
  * Обработать ошибку запуска MCLC
  */
-function purgeCorruptedNeoForge(rootPath) {
+function purgeCorruptedNeoForge(rootPath, neoforgeVersion = NEOFORGE_VERSION) {
     // Delete corrupted version JSON so installer recreates it cleanly
     try {
-        const neoforgeVerId = `neoforge-${NEOFORGE_VERSION}`;
+        const neoforgeVerId = `neoforge-${neoforgeVersion}`;
         const neoforgeJsonPath = path.join(rootPath, 'versions', neoforgeVerId, `${neoforgeVerId}.json`);
         if (fs.existsSync(neoforgeJsonPath)) {
             fs.unlinkSync(neoforgeJsonPath);
         }
-    } catch (e) {}
+    } catch (e) { }
     // Delete cpw libraries (bootstraplauncher, securejarhandler)
     try {
         const cpwDir = path.join(rootPath, 'libraries', 'cpw');
         if (fs.existsSync(cpwDir)) {
             fs.rmSync(cpwDir, { recursive: true, force: true });
         }
-    } catch (e) {}
+    } catch (e) { }
 }
 
-function handleLaunchError(error, rootPath) {
+function handleLaunchError(error, rootPath, profile) {
     const msg = (error && error.message) ? error.message : String(error);
     const isEperm = msg.includes('EPERM') || error?.code === 'EPERM';
     const isClassNotFound = msg.includes('NoClassDefFoundError') || msg.includes('modlauncher') || msg.includes('securejarhandler');
-    
+
     if (isClassNotFound) {
-        purgeCorruptedNeoForge(rootPath);
+        if (profile?.loader === 'neoforge') {
+            purgeCorruptedNeoForge(rootPath, profile.neoforgeVersion || NEOFORGE_VERSION);
+        }
         return {
             success: false,
             error:
@@ -786,7 +862,7 @@ function handleLaunchError(error, rootPath) {
                 `Техническая ошибка: ${msg}`
         };
     }
-    
+
     return { success: false, error: msg };
 }
 
@@ -797,7 +873,7 @@ async function launchGame(event, options) {
     if (isGameRunning) {
         return { success: false, error: "Игра уже запущена!" };
     }
-    
+
     isGameRunning = true;
     isLaunchCancelled = false;
     currentGameProcess = null;
@@ -806,8 +882,12 @@ async function launchGame(event, options) {
     const signal = launchAbortController.signal;
 
     let config = loadConfig();
-    const rootPath = config.installPath;
-    
+    const requestedProfileId = options && options.profileId;
+    const profile = getBuildProfile(requestedProfileId || config.activeProfileId);
+    const profileConfig = getProfileConfig(config, profile.id);
+    config.activeProfileId = profile.id;
+    const rootPath = profileConfig.installPath;
+
     if (!fs.existsSync(rootPath)) {
         fs.mkdirSync(rootPath, { recursive: true });
     }
@@ -822,25 +902,36 @@ async function launchGame(event, options) {
         }
     };
 
+    sendLog('[PROFILE] id=' + profile.id +
+        ' requested=' + (requestedProfileId || 'none') +
+        ' active=' + config.activeProfileId +
+        ' installPath=' + rootPath);
     sendLog('Запуск с конфигурацией: ' + JSON.stringify(config));
 
     try {
         checkCancelled();
 
         // Apply default mod settings for fresh installs
-        config = await applyDefaultModSettings(config, rootPath, sendLog, sendDebug, { signal });
+        config = await applyDefaultModSettings(config, rootPath, sendLog, sendDebug, { signal, profile });
         checkCancelled();
 
-        // Preload vanilla version files
-        sendDebug('Starting ensureVanillaVersionFiles...');
-        await ensureVanillaVersionFiles(rootPath, sendLog, { signal });
-        sendDebug('ensureVanillaVersionFiles completed.');
+        // Preload the selected Minecraft version files.
+        sendDebug(`Preparing ${profile.name} (${profile.loader})...`);
+        await ensureVanillaVersionFiles(rootPath, sendLog, {
+            signal,
+            minecraftVersion: profile.minecraftVersion,
+        });
         checkCancelled();
 
         // Prepare Java
         let javaPath;
         try {
-            javaPath = await prepareJava(config, rootPath, sendLog, sendDebug, { signal, activeChildProcesses });
+            javaPath = await prepareJava(config, rootPath, sendLog, sendDebug, {
+                signal,
+                activeChildProcesses,
+                javaMajor: profile.javaMajor,
+                minecraftVersion: profile.minecraftVersion,
+            });
         } catch (e) {
             if (e.message === 'CANCELLED' || isLaunchCancelled) {
                 isGameRunning = false;
@@ -852,20 +943,24 @@ async function launchGame(event, options) {
         }
         checkCancelled();
 
-        // Prepare Forge
-        let forgeInstallerPath;
-        try {
-            forgeInstallerPath = await prepareForge(rootPath, sendLog, sendDebug, { signal });
-        } catch (e) {
-            if (e.message === 'CANCELLED' || isLaunchCancelled) {
+        let forgeInstallerPath = null;
+        if (profile.loader === 'neoforge') {
+            try {
+                forgeInstallerPath = await prepareForge(rootPath, sendLog, sendDebug, {
+                    signal,
+                    neoforgeVersion: profile.neoforgeVersion,
+                });
+            } catch (e) {
+                if (e.message === 'CANCELLED' || isLaunchCancelled) {
+                    isGameRunning = false;
+                    return { success: false, error: "Запуск отменен" };
+                }
+                sendDebug(`NeoForge download failed: ${e.stack}`);
                 isGameRunning = false;
-                return { success: false, error: "Запуск отменен" };
+                return { success: false, error: "Не удалось скачать NeoForge: " + e.message };
             }
-            sendDebug(`Forge download failed: ${e.stack}`);
-            isGameRunning = false;
-            return { success: false, error: "Не удалось скачать Forge: " + e.message };
+            checkCancelled();
         }
-        checkCancelled();
 
         // Prepare Authlib Injector
         let authlibPath;
@@ -884,7 +979,7 @@ async function launchGame(event, options) {
 
         // Sync mods
         try {
-            await syncMods(event, rootPath, config, sendLog, sendDebug, { signal });
+            await syncMods(event, rootPath, config, sendLog, sendDebug, { signal, profile });
         } catch (e) {
             if (e.message === 'CANCELLED' || isLaunchCancelled) {
                 sendLog('Запуск отменен пользователем.');
@@ -928,8 +1023,17 @@ async function launchGame(event, options) {
                         sendDebug(`Failed to compute manifest hash: ${mHashErr.message}`);
                     }
                 }
-                sendDebug(`Authenticating user: ${options.username} (v${CLIENT_VERSION}, hash: ${manifestHash.slice(0, 8)}...)`);
-                authSession = await authenticateYggdrasil(YGGDRASIL_AUTH_URL, options.username, options.token, 2, CLIENT_VERSION, manifestHash, { signal });
+                sendDebug(`Authenticating user: ${options.username} (profile: ${profile.id}, v${CLIENT_VERSION}, hash: ${manifestHash.slice(0, 8)}...)`);
+                authSession = await authenticateYggdrasil(
+                    YGGDRASIL_AUTH_URL,
+                    options.username,
+                    options.token,
+                    2,
+                    CLIENT_VERSION,
+                    manifestHash,
+                    profile.id,
+                    { signal },
+                );
                 sendLog(`Авторизация успешна. UUID: ${authSession.uuid}`);
                 sendDebug(`Auth success. UUID: ${authSession.uuid}, Name: ${authSession.name}`);
             } catch (e) {
@@ -959,7 +1063,7 @@ async function launchGame(event, options) {
                         type: "custom",
                         created: new Date().toISOString(),
                         lastUsed: new Date().toISOString(),
-                        lastVersionId: MC_VERSION
+                        lastVersionId: profile.minecraftVersion
                     }
                 },
                 settings: {},
@@ -972,13 +1076,32 @@ async function launchGame(event, options) {
             }
         }
 
+        // Prepare Fabric version metadata; libraries are resolved and downloaded by MCLC.
+        if (profile.loader === 'fabric') {
+            try {
+                await ensureFabricVersionJson(rootPath, sendLog, sendDebug, {
+                    signal,
+                    minecraftVersion: profile.minecraftVersion,
+                    fabricLoaderVersion: profile.fabricLoaderVersion,
+                });
+            } catch (e) {
+                if (e.message === 'CANCELLED' || isLaunchCancelled || signal.aborted) {
+                    isGameRunning = false;
+                    return { success: false, error: 'Запуск отменен' };
+                }
+                sendDebug(`Fabric metadata setup failed: ${e.stack || e.message}`);
+                isGameRunning = false;
+                return { success: false, error: `Не удалось подготовить Fabric ${profile.fabricLoaderVersion}: ${e.message}` };
+            }
+        }
+
         // NeoForge headless install check
-        const neoforgeVerId = `neoforge-${NEOFORGE_VERSION}`;
+        const neoforgeVerId = `neoforge-${profile.neoforgeVersion || NEOFORGE_VERSION}`;
         const neoforgeJsonPath = path.join(rootPath, 'versions', neoforgeVerId, `${neoforgeVerId}.json`);
 
-        if (!fs.existsSync(neoforgeJsonPath)) {
+        if (profile.loader === 'neoforge' && !fs.existsSync(neoforgeJsonPath)) {
             checkCancelled();
-            sendLog(`Первичная установка NeoForge ${NEOFORGE_VERSION} (~15-30 сек)...`);
+            sendLog(`Первичная установка NeoForge ${profile.neoforgeVersion} (~15-30 сек)...`);
             sendDebug(`Running NeoForge installer headless: ${forgeInstallerPath}`);
             try {
                 const { execFile } = require('child_process');
@@ -1021,7 +1144,7 @@ async function launchGame(event, options) {
                         reject(err);
                     });
                 });
-                sendLog(`✓ NeoForge ${NEOFORGE_VERSION} успешно установлен.`);
+                sendLog(`✓ NeoForge ${profile.neoforgeVersion} успешно установлен.`);
             } catch (e) {
                 if (e.message === 'CANCELLED' || isLaunchCancelled) {
                     isGameRunning = false;
@@ -1029,18 +1152,27 @@ async function launchGame(event, options) {
                 }
                 sendDebug(`NeoForge install error: ${e.stack || e.message}`);
                 isGameRunning = false;
-                return { success: false, error: `Не удалось установить NeoForge ${NEOFORGE_VERSION}:\n${e.message}` };
+                return { success: false, error: `Не удалось установить NeoForge ${profile.neoforgeVersion}:\n${e.message}` };
             }
         }
 
         checkCancelled();
 
-        // Ensure NeoForge version JSON is merged with vanilla 1.21.1 libraries BEFORE passing it to MCLC
-        ensureNeoForgeVersionJsonMerged(rootPath, sendDebug);
+        if (profile.loader === 'neoforge') {
+            // Merge NeoForge metadata before handing it to minecraft-launcher-core.
+            ensureNeoForgeVersionJsonMerged(rootPath, sendDebug, {
+                minecraftVersion: profile.minecraftVersion,
+                neoforgeVersion: profile.neoforgeVersion,
+            });
+        }
 
         // Verify NeoForge library SHA1 hashes (delete corrupted, MCLC will re-download)
         try {
-            const corrupted = await verifyNeoForgeLibraries(rootPath, sendLog, sendDebug);
+            const corrupted = profile.loader === 'neoforge'
+                ? await verifyNeoForgeLibraries(rootPath, sendLog, sendDebug, {
+                    neoforgeVersion: profile.neoforgeVersion,
+                })
+                : 0;
             if (corrupted > 0) {
                 sendDebug(`Deleted ${corrupted} corrupted libraries. MCLC will re-download them.`);
             }
@@ -1074,13 +1206,17 @@ async function launchGame(event, options) {
 
         checkCancelled();
 
-        // Ensure real Minecraft 1.21.1 asset index (17.json) exists and is populated
-        await ensureAssetIndex(rootPath, sendLog, { signal });
+        // Ensure the selected Minecraft version's asset index exists and is populated.
+        await ensureAssetIndex(rootPath, sendLog, {
+            signal,
+            minecraftVersion: profile.minecraftVersion,
+            neoforgeVersion: profile.neoforgeVersion,
+        });
 
         checkCancelled();
 
         // Build launch options
-        const opts = buildLaunchOptions(config, rootPath, javaPath, forgeInstallerPath, authlibPath, authSession, authlibPrefetched);
+        const opts = buildLaunchOptions(config, rootPath, javaPath, forgeInstallerPath, authlibPath, authSession, authlibPrefetched, profile);
 
         // Cleanup empty files before launch
         sendLog('Проверка целостности библиотек...');
@@ -1096,9 +1232,13 @@ async function launchGame(event, options) {
 
         // Preflight checks
         try {
-            sendDebug('Preflight: checking NeoForge library writability...');
-            await preflightNeoForgeLibraries(rootPath, sendLog, sendDebug);
-            sendDebug('Preflight: Forge library writability OK.');
+            if (profile.loader === 'neoforge') {
+                sendDebug('Preflight: checking NeoForge library writability...');
+                await preflightNeoForgeLibraries(rootPath, sendLog, sendDebug, {
+                    neoforgeVersion: profile.neoforgeVersion,
+                });
+                sendDebug('Preflight: Forge library writability OK.');
+            }
         } catch (e) {
             sendDebug(`Preflight failed: ${e.stack || e.message}`);
             isGameRunning = false;
@@ -1109,7 +1249,7 @@ async function launchGame(event, options) {
 
         sendLog('Запуск ядра Minecraft...');
         sendDebug('Launching MCLC with options: ' + JSON.stringify(opts, null, 2));
-        
+
         const mainWindow = BrowserWindow.fromWebContents(event.sender);
 
         // Remove all previous listeners to prevent memory leaks
@@ -1122,11 +1262,11 @@ async function launchGame(event, options) {
             stopModWatcher();
             sendLog(`[LAUNCHER] Игра закрылась с кодом ${code}`);
             sendDebug(`Game closed with code ${code}`);
-            
+
             // Switch Discord RPC back to Launcher status
             try {
                 discordRpc.setLauncherActivity({ username: authSession?.name || options?.username });
-            } catch (_) {}
+            } catch (_) { }
 
             if (logStream) logStream.end();
 
@@ -1135,7 +1275,7 @@ async function launchGame(event, options) {
                     if (mainWindow.isMinimized()) mainWindow.restore();
                     if (!mainWindow.isVisible()) mainWindow.show();
                     mainWindow.focus();
-                } catch (_) {}
+                } catch (_) { }
                 safeSend(mainWindow, 'game-closed');
             }
         });
@@ -1155,7 +1295,7 @@ async function launchGame(event, options) {
                             username: authSession?.name || options?.username,
                             startTime: Math.floor(Date.now() / 1000)
                         });
-                    } catch (_) {}
+                    } catch (_) { }
 
                     resolve({ success: true });
                 }
@@ -1195,14 +1335,16 @@ async function launchGame(event, options) {
                 )) {
                     detectedFatalClassError = true;
                     sendLog('[LAUNCHER] Обнаружена критическая ошибка загрузки NeoForge. Автоматическое восстановление...');
-                    purgeCorruptedNeoForge(rootPath);
+                    if (profile.loader === 'neoforge') {
+                        purgeCorruptedNeoForge(rootPath, profile.neoforgeVersion || NEOFORGE_VERSION);
+                    }
                     sendLog('[LAUNCHER] Повреждённые файлы удалены. Пожалуйста, нажмите «Играть» ещё раз.');
-                    safeSend(mainWindow, 'launch-error', 
+                    safeSend(mainWindow, 'launch-error',
                         'Обнаружена ошибка NeoForge. Лаунчер автоматически починил файлы.\n' +
                         'Нажмите «Играть» ещё раз!');
                 }
             });
-            
+
             launcher.on('error', (e) => {
                 const text = String(e).trim();
                 if (text) sendLog(`[GAME ERROR] ${text}`);
@@ -1257,7 +1399,7 @@ async function launchGame(event, options) {
                     if (error.message === 'CANCELLED' || isLaunchCancelled || signal.aborted) {
                         resolve({ success: false, error: "Запуск отменен" });
                     } else {
-                        resolve(handleLaunchError(error, rootPath));
+                        resolve(handleLaunchError(error, rootPath, profile));
                     }
                 } else {
                     if (error.message === 'CANCELLED' || isLaunchCancelled || signal.aborted) {
@@ -1268,7 +1410,7 @@ async function launchGame(event, options) {
                 }
             });
         });
-        
+
     } catch (e) {
         sendDebug(`Launcher exception: ${e.stack}`);
         if (currentGameProcess) {

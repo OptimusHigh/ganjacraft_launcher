@@ -73,9 +73,9 @@ export function settingsChanged() {
 export const updateSaveButtonVisibility = debounce(() => {
     const saveBtn = dom.get('save-settings');
     if (!saveBtn) return;
-    
+
     hasUnsavedChanges = settingsChanged() || hasUnsavedConfigs();
-    
+
     if (hasUnsavedChanges) {
         saveBtn.classList.add('visible');
     } else {
@@ -90,11 +90,11 @@ export function setupSettingsChangeListeners() {
     // Text inputs - используем passive для лучшей производительности
     const textInputs = [
         'setting-path',
-        'setting-java', 
+        'setting-java',
         'setting-ram-min',
         'setting-ram-max'
     ];
-    
+
     textInputs.forEach(id => {
         const el = document.getElementById(id);
         if (el) {
@@ -102,13 +102,13 @@ export function setupSettingsChangeListeners() {
             el.addEventListener('change', updateSaveButtonVisibility, { passive: true });
         }
     });
-    
+
     // RAM Sliders (новый UI)
     const ramSliders = [
         'setting-ram-slider-min',
         'setting-ram-slider-max'
     ];
-    
+
     ramSliders.forEach(id => {
         const el = document.getElementById(id);
         if (el) {
@@ -116,7 +116,7 @@ export function setupSettingsChangeListeners() {
             el.addEventListener('change', updateSaveButtonVisibility, { passive: true });
         }
     });
-    
+
     // Controls (Checkboxes & Selects)
     const formControls = [
         'setting-hide-on-play',
@@ -128,16 +128,16 @@ export function setupSettingsChangeListeners() {
         'setting-enable-minigame',
         'setting-enable-discord-rpc'
     ];
-    
+
     formControls.forEach(id => {
         const el = document.getElementById(id);
         if (el) {
             el.addEventListener('change', updateSaveButtonVisibility, { passive: true });
         }
     });
-    
 
-    
+
+
     // Mods list - event delegation (grid container)
     const modsGrid = document.getElementById('mods-grid');
     if (modsGrid) {
@@ -441,7 +441,11 @@ export function closeSettings(instant = false) {
 export function populateSettingsFields(config) {
     currentConfig = config || {};
     initDOMRefs();
-    
+
+    const activeProfileId = window.__activeBuildProfileId || currentConfig.activeProfileId || 'vanilla';
+    const activeProfile = currentConfig.profiles?.[activeProfileId];
+    const activeInstallPath = activeProfile?.installPath || currentConfig.installPath || '';
+
     const pathInput = document.getElementById('setting-path');
     const javaInput = document.getElementById('setting-java');
     const ramMinInput = document.getElementById('setting-ram-min');
@@ -454,13 +458,13 @@ export function populateSettingsFields(config) {
     const parallaxCheckbox = document.getElementById('setting-enable-parallax');
     const minigameCheckbox = document.getElementById('setting-enable-minigame');
     const discordRpcCheckbox = document.getElementById('setting-enable-discord-rpc');
-    
-    if (pathInput) pathInput.value = config.installPath || '';
+
+    if (pathInput) pathInput.value = activeInstallPath;
     if (javaInput) javaInput.value = config.javaPath || '';
     if (ramMinInput) ramMinInput.value = config.memoryMin || '1G';
     if (ramMaxInput) ramMaxInput.value = config.memoryMax || '3G';
     if (hideOnPlayCheckbox) hideOnPlayCheckbox.checked = config.hideOnPlay !== false;
-    
+
     const skinMode = config.skinMode || getSkinViewerMode() || '3d';
     if (skinModeSelect) skinModeSelect.value = skinMode;
 
@@ -470,12 +474,12 @@ export function populateSettingsFields(config) {
     }
     if (presetSelect) presetSelect.value = preset;
     if (densitySelect) densitySelect.value = config.effectsDensity || 'low';
-    
+
     if (smokeCheckbox) smokeCheckbox.checked = config.enableSmoke !== false;
     if (parallaxCheckbox) parallaxCheckbox.checked = config.enableParallax !== false;
     if (minigameCheckbox) minigameCheckbox.checked = config.enableMinigame !== false && gunShooter.getIsEnabled();
     if (discordRpcCheckbox) discordRpcCheckbox.checked = config.enableDiscordRpc !== false;
-    
+
     // Инициализация RAM slider (новый UI)
     initRamSlider(config);
 }
@@ -500,9 +504,25 @@ export async function saveSettings() {
     const selectedMinigame = document.getElementById('setting-enable-minigame')?.checked ?? true;
     const selectedDiscordRpc = document.getElementById('setting-enable-discord-rpc')?.checked ?? true;
 
+    const activeProfileId = window.__activeBuildProfileId || currentConfig.activeProfileId || 'vanilla';
+    const selectedInstallPath = document.getElementById('setting-path')?.value || '';
+    const profiles = {
+        ...(currentConfig.profiles || {}),
+        [activeProfileId]: {
+            ...(currentConfig.profiles?.[activeProfileId] || {}),
+            installPath: selectedInstallPath,
+            disabledMods: getDisabledMods(),
+        },
+    };
+
     const newConfig = {
         ...currentConfig,
-        installPath: document.getElementById('setting-path')?.value || '',
+        activeProfileId,
+        // Legacy alias remains the Vanilla path for older launcher code.
+        installPath: activeProfileId === 'vanilla'
+            ? selectedInstallPath
+            : (profiles.vanilla?.installPath || currentConfig.installPath || ''),
+        profiles,
         javaPath: document.getElementById('setting-java')?.value || '',
         memoryMin: memMin,
         memoryMax: memMax,
@@ -519,13 +539,13 @@ export async function saveSettings() {
         modsDefaultsApplied: true,
         modsDefaultsVersion: 2,
     };
-    
+
     const ok = await window.api.saveConfig(newConfig);
     if (!ok) {
         logToConsole('[SETTINGS] Ошибка сохранения настроек (конфиг не записан).');
         return false;
     }
-    
+
     currentConfig = newConfig;
 
     // Apply Minigame state
@@ -533,7 +553,7 @@ export async function saveSettings() {
 
     // Apply Skin Mode (3D / 2D / off)
     applySkinMode(selectedSkinMode);
-    
+
     // Apply Visual Effects
     applyEffectsConfig(newConfig);
 
@@ -542,7 +562,7 @@ export async function saveSettings() {
     } else {
         stopSmokeEffect();
     }
-    
+
     // Toggle Parallax
     if (newConfig.enableParallax) {
         startParallax();
@@ -676,7 +696,7 @@ export function switchTab(targetTabId) {
  */
 export function initSettingsTabs(config) {
     const tabButtons = Array.from(document.querySelectorAll('.settings-tabs .tab-btn'));
-    
+
     tabButtons.forEach((btn) => {
         if (btn.dataset.tabsBound) return;
         btn.dataset.tabsBound = 'true';
@@ -695,7 +715,7 @@ export function initPathSelectors() {
     const openPathBtn = document.getElementById('btn-open-path');
     const selectJavaBtn = document.getElementById('btn-select-java');
     const resetJavaBtn = document.getElementById('btn-reset-java');
-    
+
     if (selectPathBtn && !selectPathBtn.dataset.bound) {
         selectPathBtn.dataset.bound = 'true';
         selectPathBtn.addEventListener('click', async () => {
@@ -706,7 +726,7 @@ export function initPathSelectors() {
             }
         });
     }
-    
+
     if (openPathBtn && !openPathBtn.dataset.bound) {
         openPathBtn.dataset.bound = 'true';
         openPathBtn.addEventListener('click', async () => {
@@ -716,7 +736,7 @@ export function initPathSelectors() {
             }
         });
     }
-    
+
     if (selectJavaBtn && !selectJavaBtn.dataset.bound) {
         selectJavaBtn.dataset.bound = 'true';
         selectJavaBtn.addEventListener('click', async () => {
@@ -727,7 +747,7 @@ export function initPathSelectors() {
             }
         });
     }
-    
+
     if (resetJavaBtn && !resetJavaBtn.dataset.bound) {
         resetJavaBtn.dataset.bound = 'true';
         resetJavaBtn.addEventListener('click', () => {
@@ -764,7 +784,7 @@ export function initReinstallButton() {
 export function initModsButtons() {
     const selectAllBtn = document.getElementById('mods-select-all');
     const deselectAllBtn = document.getElementById('mods-deselect-all');
-    
+
     if (selectAllBtn && !selectAllBtn.dataset.bound) {
         selectAllBtn.dataset.bound = 'true';
         selectAllBtn.addEventListener('click', () => {
@@ -774,7 +794,7 @@ export function initModsButtons() {
             updateSaveButtonVisibility();
         });
     }
-    
+
     if (deselectAllBtn && !deselectAllBtn.dataset.bound) {
         deselectAllBtn.dataset.bound = 'true';
         deselectAllBtn.addEventListener('click', () => {

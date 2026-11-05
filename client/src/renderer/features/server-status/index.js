@@ -5,5 +5,7 @@
 export {
     updateServerStatus,
     startStatusChecker,
-    stopStatusChecker
+    stopStatusChecker,
+    initBuildProfileSelector,
+    setServerProfile
 } from './server-status.js';

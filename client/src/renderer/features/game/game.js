@@ -46,14 +46,14 @@ export function lockControlsForLaunch() {
     } catch (e) {
         // ignore
     }
-    
+
     const btnSettings = dom.get('btn-settings');
     const btnChangelog = dom.get('btn-changelog');
     const titleBtn = dom.get('title-bar-title');
     const settingsTabsBar = dom.get('settings-tabs-bar');
     const playBtn = dom.get('play-btn');
     const popCounter = dom.get('particle-pop-counter');
-    
+
     if (btnSettings) {
         btnSettings.classList.remove('disabled-launch');
         btnSettings.removeAttribute('disabled');
@@ -101,7 +101,7 @@ export function unlockControlsAfterLaunch() {
     const btnChangelog = dom.get('btn-changelog');
     const titleBtn = dom.get('title-bar-title');
     const playBtn = dom.get('play-btn');
-    
+
     if (btnSettings) {
         btnSettings.classList.remove('disabled-launch');
         btnSettings.classList.remove('active-log-btn');
@@ -133,9 +133,9 @@ export function unlockControlsAfterLaunch() {
  */
 export function setJointProgress(container, burn, endImg, percent) {
     if (!container) return;
-    
+
     const safePercent = Number.isFinite(percent) ? Math.max(0, Math.min(100, percent)) : 0;
-    
+
     // Constants for realistic smoking effect
     const MAX_WIDTH = 260; // Total width of the image in pixels
     const MIN_WIDTH = 28;  // Width at 100% progress (the filter/butt)
@@ -146,7 +146,7 @@ export function setJointProgress(container, burn, endImg, percent) {
     // 0% progress -> MAX_WIDTH
     // 100% progress -> MIN_WIDTH
     const currentWidthPx = MAX_WIDTH - ((MAX_WIDTH - MIN_WIDTH) * (safePercent / 100));
-    
+
     // Calculate burn height (thickness)
     const currentBurnHeight = START_BURN_HEIGHT - ((START_BURN_HEIGHT - END_BURN_HEIGHT) * (safePercent / 100));
 
@@ -159,29 +159,29 @@ export function setJointProgress(container, burn, endImg, percent) {
         // In progress
         container.classList.remove('hidden');
         container.style.width = `${currentWidthPx}px`;
-        
+
         if (burn) {
             burn.classList.remove('hidden');
-            
+
             // Position: The burn is separate from the container in the DOM.
             // It tracks the left edge of the visible joint.
             // Since the joint is anchored right, the left edge is at (MAX_WIDTH - currentWidthPx).
             const burnLeftPos = MAX_WIDTH - currentWidthPx;
             burn.style.left = `${burnLeftPos}px`;
-            
+
             // Vertical Trajectory: Moves down by 3px as it burns
             // 0% -> 0px offset
             // 100% -> 3px offset
             const verticalOffset = 3 * (safePercent / 100);
             burn.style.top = `${verticalOffset}px`;
-            
+
             // Update height/thickness of the burning tip
             const burnTip = burn.querySelector('.joint-burn');
             if (burnTip) {
                 burnTip.style.height = `${currentBurnHeight}px`;
             }
         }
-        
+
         if (endImg) endImg.classList.add('hidden');
     }
 }
@@ -192,7 +192,7 @@ export function setJointProgress(container, burn, endImg, percent) {
 function showPlayScreen() {
     const stepPlay = dom.get('step-play');
     const stepProgress = dom.get('step-progress');
-    
+
     if (stepProgress) stepProgress.classList.add('hidden');
     if (stepPlay) {
         stepPlay.classList.remove('hidden');
@@ -221,17 +221,17 @@ export async function startLaunch() {
     const gameJointProgress = dom.get('game-joint-progress');
     const gameJointBurn = dom.get('game-joint-burn');
     const gameJointEnd = dom.get('game-joint-end');
-    
+
     // Reset UI
     if (statusDiv) {
         statusDiv.innerText = 'Инициализация запуска...';
         statusDiv.style.color = '#39ff14';
     }
     setJointProgress(gameJointProgress, gameJointBurn, gameJointEnd, 0);
-    
+
     if (retryBtn) retryBtn.classList.add('hidden');
     if (cancelBtn) cancelBtn.classList.remove('hidden');
-    
+
     // Auto-save any pending setting or mod changes before launching
     if (settingsChanged()) {
         logToConsole('[SETTINGS] Сохранение изменённых настроек перед запуском...');
@@ -241,12 +241,13 @@ export async function startLaunch() {
     logToConsole('[LAUNCHER] Подготовка к запуску игры...');
     console.log('[GAME] Calling window.api.launchGame...');
 
-    const result = await window.api.launchGame({ 
+    const result = await window.api.launchGame({
         username: getCurrentUsername(),
-        token: getAuthToken()
+        token: getAuthToken(),
+        profileId: window.__activeBuildProfileId || undefined,
     });
     console.log('[GAME] window.api.launchGame returned:', result);
-    
+
     if (result.success) {
         if (statusDiv) {
             statusDiv.innerText = 'Загрузка Minecraft и модов...';
@@ -256,7 +257,7 @@ export async function startLaunch() {
     } else {
         // Error Handling
         console.error(result.error);
-        
+
         const err = result.error ? result.error.toString() : 'Неизвестная ошибка';
 
         // Handle Cancellation
@@ -271,22 +272,22 @@ export async function startLaunch() {
             unlockControlsAfterLaunch();
             return;
         }
-        
+
         let msg = 'Ошибка запуска';
-        
+
         if (err.includes('ENOTFOUND') || err.includes('ETIMEDOUT') || err.includes('UnknownHostException')) {
             msg = 'Потеряно соединение. Проверьте интернет.';
         } else {
             msg = 'Ошибка: ' + err.substring(0, 40) + (err.length > 40 ? '...' : '');
         }
-        
+
         if (statusDiv) {
             statusDiv.innerText = msg;
             statusDiv.style.color = '#ef5350';
         }
-        
+
         logToConsole(`[ERROR] ${result.error}`);
-        
+
         // Show Retry
         if (retryBtn) retryBtn.classList.remove('hidden');
         if (cancelBtn) cancelBtn.classList.add('hidden');
@@ -299,7 +300,7 @@ export async function startLaunch() {
  */
 export async function cancelLaunch() {
     logToConsole('[LAUNCHER] Отмена запуска пользователем...');
-    
+
     const statusDiv = dom.get('game-status') || dom.get('status');
     const gameJointProgress = dom.get('game-joint-progress');
     const gameJointBurn = dom.get('game-joint-burn');
@@ -351,7 +352,7 @@ export function initProgressHandlers() {
     const cancelBtn = dom.get('cancel-btn');
     const stepProgress = dom.get('step-progress');
     const stepPlay = dom.get('step-play');
-    
+
     // Progress Handler
     if (window.api.onProgress) {
         window.api.onProgress((e) => {
@@ -379,7 +380,7 @@ export function initProgressHandlers() {
     window.api.onLog((text) => {
         logToConsole(text);
         const statusEl = dom.get('game-status') || dom.get('status');
-        
+
         if (text.includes('Скачивание:')) {
             if (statusEl) statusEl.innerText = 'Загрузка ресурсов...';
             if (gameJointProgress && !gameJointProgress.classList.contains('hidden') && gameJointProgress.style.width === '100%') {
@@ -404,7 +405,7 @@ export function initProgressHandlers() {
                 statusEl.innerText = 'Игра запущена';
                 statusEl.style.color = '#39ff14';
             }
-            
+
             // Завершаем режим тира
             gunShooter.setGameLaunchingMode(false);
 
@@ -419,20 +420,20 @@ export function initProgressHandlers() {
     // Game Closed Handler
     window.api.onGameClosed(() => {
         logToConsole('[LAUNCHER] Игровая сессия завершена.');
-        
+
         if (stepProgress) stepProgress.classList.add('hidden');
         if (stepPlay) {
             stepPlay.classList.remove('hidden');
             stepPlay.classList.add('fade-in');
         }
-        
+
         setJointProgress(gameJointProgress, gameJointBurn, gameJointEnd, 0);
         const statusEl = dom.get('game-status') || dom.get('status');
         if (statusEl) {
             statusEl.innerText = 'Готов к игре';
             statusEl.style.color = '#39ff14';
         }
-        
+
         const playBtn = dom.get('play-btn');
         if (playBtn) {
             playBtn.disabled = false;
@@ -451,7 +452,7 @@ export function initGameButtons() {
     const retryBtn = dom.get('retry-btn');
     const stepPlay = dom.get('step-play');
     const stepProgress = dom.get('step-progress');
-    
+
     if (playBtn) {
         playBtn.addEventListener('click', () => {
             if (isGameLaunching) {
@@ -467,11 +468,11 @@ export function initGameButtons() {
             }
         });
     }
-    
+
     if (cancelBtn) {
         cancelBtn.addEventListener('click', cancelLaunch);
     }
-    
+
     if (retryBtn) {
         retryBtn.addEventListener('click', () => {
             if (isLauncherUpdateAvailable()) {

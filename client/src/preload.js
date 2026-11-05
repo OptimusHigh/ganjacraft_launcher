@@ -10,10 +10,10 @@ const DEFAULT_TIMEOUT = 25000;
 
 async function fetchWithTimeout(resource, options = {}) {
     const { timeout = 5000 } = options;
-    
+
     const controller = new AbortController();
     const id = setTimeout(() => controller.abort(), timeout);
-    
+
     try {
         const response = await fetch(resource, {
             ...options,
@@ -55,15 +55,15 @@ async function apiCall(endpoint, { method = 'POST', body = null, headers = {}, r
                 body: body ? JSON.stringify(body) : undefined,
                 timeout: DEFAULT_TIMEOUT
             });
-            
+
             if (response.ok) {
                 return await readJsonOrThrow(response);
             }
-            
+
             const text = await response.text();
             let data = null;
-            try { data = JSON.parse(text); } catch {}
-            
+            try { data = JSON.parse(text); } catch { }
+
             if (data && (data.message || data.error || data.detail)) {
                 const msg = data.message || data.error || (Array.isArray(data.detail) ? data.detail[0]?.msg : String(data.detail));
                 if (returnErrorAsResult) return { success: false, message: msg, status: response.status, has_password: data.has_password };
@@ -96,7 +96,9 @@ if (MOCK_AUTH) console.log('[MOCK_AUTH] Mock auth mode enabled');
 contextBridge.exposeInMainWorld('api', {
     isMockAuth: MOCK_AUTH,
     launchGame: (options) => ipcRenderer.invoke('launch-game', options),
-    
+    getBuildProfiles: () => ipcRenderer.invoke('get-build-profiles'),
+    setActiveProfile: (profileId) => ipcRenderer.invoke('set-active-profile', profileId),
+
     // Auth API calls with offline fallback when backend is not running
     requestAuth: async (username) => {
         if (MOCK_AUTH) return { success: true, message: '[MOCK] Code sent', has_password: true };
@@ -152,14 +154,14 @@ contextBridge.exposeInMainWorld('api', {
             return { success: true, is_admin: false, offline: true };
         }
     },
-    
+
     getNews: async () => {
         if (MOCK_AUTH) return { success: true, news: [{ id: 1, title: '[MOCK] Ganj4Craft News', content: 'Локальный тестовый режим', date: new Date().toISOString() }] };
         for (const base of API_BASES) {
             try {
                 const response = await fetchWithTimeout(`${base}/news?limit=50`, { timeout: 4000 });
                 if (response.ok) return await response.json();
-            } catch (e) {}
+            } catch (e) { }
         }
         return { success: false, news: [] };
     },
@@ -169,17 +171,17 @@ contextBridge.exposeInMainWorld('api', {
     close: () => ipcRenderer.send('window-close'),
     onWindowRestore: (callback) => ipcRenderer.on('window-restore', () => callback()),
     onWindowFocus: (callback) => ipcRenderer.on('window-focus', () => callback()),
-    
+
     // Settings & Config
     loadConfig: () => ipcRenderer.invoke('load-config'),
     saveConfig: (config) => ipcRenderer.invoke('save-config', config),
-    getGameConfigs: () => ipcRenderer.invoke('get-game-configs'),
+    getGameConfigs: (profileId) => ipcRenderer.invoke('get-game-configs', profileId),
     saveGameConfig: (filePath, key, value) => ipcRenderer.invoke('save-game-config', filePath, key, value),
     getAppVersion: () => ipcRenderer.invoke('get-app-version'),
     selectPath: (type) => ipcRenderer.invoke('select-path', type), // type: 'dir' or 'file'
     openFolder: (path) => ipcRenderer.invoke('open-folder', path),
     openUrl: (url) => ipcRenderer.invoke('open-url', url),
-    
+
     // Discord Rich Presence
     setDiscordRpcEnabled: (enabled) => ipcRenderer.invoke('set-discord-rpc-enabled', enabled),
     updateDiscordActivity: (data) => ipcRenderer.invoke('update-discord-activity', data),
@@ -187,15 +189,15 @@ contextBridge.exposeInMainWorld('api', {
     // Advanced
     reinstallClient: () => ipcRenderer.invoke('reinstall-client'),
 
-    getManifest: () => ipcRenderer.invoke('get-manifest'), // To list mods in UI
-    getManifestHistory: () => ipcRenderer.invoke('get-manifest-history'), // History of pack updates
+    getManifest: (profileId) => ipcRenderer.invoke('get-manifest', profileId), // To list mods in UI
+    getManifestHistory: (profileId) => ipcRenderer.invoke('get-manifest-history', profileId), // History of pack updates
     getLauncherReleases: () => ipcRenderer.invoke('get-launcher-releases'), // History of launcher client releases
     resolveModrinth: (hashes) => ipcRenderer.invoke('resolve-modrinth', hashes),
-    
+
     // Events
     onGameReady: (callback) => ipcRenderer.on('game-ready', () => callback()),
     onGameClosed: (callback) => ipcRenderer.on('game-closed', () => callback()),
-    
+
     // Updater
     onUpdateAvailable: (callback) => ipcRenderer.on('update-available', (event, info) => callback(info)),
     onUpdateProgress: (callback) => ipcRenderer.on('update-progress', (event, progress) => callback(progress)),

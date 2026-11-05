@@ -8,7 +8,7 @@ const path = require('path');
 const crypto = require('crypto');
 const { downloadFile } = require('../../modules/updater');
 const { isZipIntact, ensureWritableFilePath } = require('./integrity');
-const { 
+const {
     MC_VERSION,
     NEOFORGE_VERSION,
     VANILLA_VERSION_JSON_URL,
@@ -27,13 +27,35 @@ const {
  */
 async function ensureVanillaVersionFiles(rootPath, sendLog, options = {}) {
     const signal = options.signal;
+    const minecraftVersion = options.minecraftVersion || MC_VERSION;
+    let versionJsonUrl = options.versionJsonUrl || VANILLA_VERSION_JSON_URL;
+    let versionJarUrl = options.versionJarUrl || VANILLA_VERSION_JAR_URL;
+
+    // Resolve the selected Minecraft release instead of reusing the legacy 1.21.1 URLs.
+    if (!options.versionJsonUrl && minecraftVersion !== MC_VERSION) {
+        const response = await fetch('https://piston-meta.mojang.com/mc/game/version_manifest_v2.json', { signal });
+        if (!response.ok) throw new Error(`Не удалось получить список версий Minecraft: HTTP ${response.status}`);
+        const manifest = await response.json();
+        const version = Array.isArray(manifest.versions)
+            ? manifest.versions.find(item => item.id === minecraftVersion)
+            : null;
+        if (!version || !version.url) {
+            throw new Error(`Версия Minecraft ${minecraftVersion} отсутствует в официальном manifest`);
+        }
+        versionJsonUrl = version.url;
+        const versionResponse = await fetch(versionJsonUrl, { signal });
+        if (!versionResponse.ok) throw new Error(`Не удалось получить metadata Minecraft ${minecraftVersion}: HTTP ${versionResponse.status}`);
+        const versionJson = await versionResponse.json();
+        versionJarUrl = versionJson.downloads?.client?.url;
+        if (!versionJarUrl) throw new Error(`В metadata Minecraft ${minecraftVersion} отсутствует client.jar`);
+    }
     if (signal && signal.aborted) {
         throw new Error('CANCELLED');
     }
 
-    const versionDir = path.join(rootPath, 'versions', MC_VERSION);
-    const versionJsonPath = path.join(versionDir, `${MC_VERSION}.json`);
-    const versionJarPath = path.join(versionDir, `${MC_VERSION}.jar`);
+    const versionDir = path.join(rootPath, 'versions', minecraftVersion);
+    const versionJsonPath = path.join(versionDir, `${minecraftVersion}.json`);
+    const versionJarPath = path.join(versionDir, `${minecraftVersion}.jar`);
 
     if (!fs.existsSync(versionDir)) {
         fs.mkdirSync(versionDir, { recursive: true });
@@ -51,19 +73,19 @@ async function ensureVanillaVersionFiles(rootPath, sendLog, options = {}) {
     }
 
     if (!versionJsonOk) {
-        sendLog(`Скачивание версии Minecraft ${MC_VERSION} (json)...`);
+        sendLog(`Скачивание версии Minecraft ${minecraftVersion} (json)...`);
         const tmpJson = `${versionJsonPath}.tmp`;
         try {
-            await downloadFile(VANILLA_VERSION_JSON_URL, tmpJson, { timeoutMs: 60_000, signal });
+            await downloadFile(versionJsonUrl, tmpJson, { timeoutMs: 60_000, signal });
             if (signal && signal.aborted) throw new Error('CANCELLED');
             const parsed = JSON.parse(fs.readFileSync(tmpJson, 'utf8'));
             fs.writeFileSync(versionJsonPath, JSON.stringify(parsed, null, 2), 'utf8');
-            try { fs.unlinkSync(tmpJson); } catch {}
-            sendLog(`Версия ${MC_VERSION} (json) готова.`);
+            try { fs.unlinkSync(tmpJson); } catch { }
+            sendLog(`Версия ${minecraftVersion} (json) готова.`);
         } catch (e) {
-            try { if (fs.existsSync(tmpJson)) fs.unlinkSync(tmpJson); } catch {}
+            try { if (fs.existsSync(tmpJson)) fs.unlinkSync(tmpJson); } catch { }
             if (e.message === 'CANCELLED' || signal?.aborted) throw new Error('CANCELLED');
-            throw new Error(`Не удалось подготовить ${MC_VERSION}.json: ${e.message}`);
+            throw new Error(`Не удалось подготовить ${minecraftVersion}.json: ${e.message}`);
         }
     }
 
@@ -74,20 +96,20 @@ async function ensureVanillaVersionFiles(rootPath, sendLog, options = {}) {
     // Ensure client jar exists
     let needJar = !fs.existsSync(versionJarPath);
     if (!needJar && !isZipIntact(versionJarPath)) {
-        sendLog(`Обнаружен поврежденный ${MC_VERSION}.jar. Перекачивание...`);
-        try { fs.unlinkSync(versionJarPath); } catch {}
+        sendLog(`Обнаружен поврежденный ${minecraftVersion}.jar. Перекачивание...`);
+        try { fs.unlinkSync(versionJarPath); } catch { }
         needJar = true;
     }
 
     if (needJar) {
-        sendLog(`Скачивание версии Minecraft ${MC_VERSION} (jar)...`);
-        await downloadFile(VANILLA_VERSION_JAR_URL, versionJarPath, { timeoutMs: 180_000, signal });
+        sendLog(`Скачивание версии Minecraft ${minecraftVersion} (jar)...`);
+        await downloadFile(versionJarUrl, versionJarPath, { timeoutMs: 180_000, signal });
         if (signal && signal.aborted) throw new Error('CANCELLED');
         if (!isZipIntact(versionJarPath)) {
-            try { fs.unlinkSync(versionJarPath); } catch {}
-            throw new Error(`Скачанный ${MC_VERSION}.jar поврежден (невалидный JAR/ZIP)`);
+            try { fs.unlinkSync(versionJarPath); } catch { }
+            throw new Error(`Скачанный ${minecraftVersion}.jar поврежден (невалидный JAR/ZIP)`);
         }
-        sendLog(`Версия ${MC_VERSION} (jar) скачана.`);
+        sendLog(`Версия ${minecraftVersion} (jar) скачана.`);
     }
 }
 
@@ -95,8 +117,10 @@ async function ensureVanillaVersionFiles(rootPath, sendLog, options = {}) {
  * Парсит modulepath (-p) и другие JVM аргументы из NeoForge version.json
  * Возвращает готовые аргументы с подстановкой ${library_directory} и ${classpath_separator}
  */
-function parseNeoForgeJvmArgs(rootPath) {
-    const neoforgeVerId = `neoforge-${NEOFORGE_VERSION}`;
+function parseNeoForgeJvmArgs(rootPath, options = {}) {
+    const minecraftVersion = options.minecraftVersion || MC_VERSION;
+    const neoforgeVersion = options.neoforgeVersion || NEOFORGE_VERSION;
+    const neoforgeVerId = `neoforge-${neoforgeVersion}`;
     const jsonPath = path.join(rootPath, 'versions', neoforgeVerId, `${neoforgeVerId}.json`);
     if (!fs.existsSync(jsonPath)) return null;
 
@@ -149,7 +173,7 @@ function parseNeoForgeJvmArgs(rootPath) {
             const arg = rawStrings[i];
             if (typeof arg !== 'string') continue;
 
-            if (arg === '-cp' && rawStrings[i+1] === '${classpath}') {
+            if (arg === '-cp' && rawStrings[i + 1] === '${classpath}') {
                 i++; // skip both
                 continue;
             }
@@ -159,7 +183,7 @@ function parseNeoForgeJvmArgs(rootPath) {
             args.push(arg
                 .replace(/\$\{library_directory\}/g, libraryDir)
                 .replace(/\$\{classpath_separator\}/g, separator)
-                .replace(/\$\{version_name\}/g, MC_VERSION)
+                .replace(/\$\{version_name\}/g, minecraftVersion)
             );
         }
         return args;
@@ -174,21 +198,22 @@ function parseNeoForgeJvmArgs(rootPath) {
  * @param {Function} sendLog - Функция логирования
  * @param {Function} sendDebug - Функция дебаг-логирования
  */
-async function preflightNeoForgeLibraries(rootPath, sendLog, sendDebug) {
+async function preflightNeoForgeLibraries(rootPath, sendLog, sendDebug, options = {}) {
     const librariesDir = path.join(rootPath, 'libraries');
-    const neoforgeVerId = `neoforge-${NEOFORGE_VERSION}`;
+    const neoforgeVersion = options.neoforgeVersion || NEOFORGE_VERSION;
+    const neoforgeVerId = `neoforge-${neoforgeVersion}`;
     const jsonPath = path.join(rootPath, 'versions', neoforgeVerId, `${neoforgeVerId}.json`);
-    
+
     if (!fs.existsSync(jsonPath)) {
         sendDebug('Preflight: NeoForge version JSON not found, skipping.');
         return;
     }
-    
+
     let criticalLibPaths = [];
     try {
         const json = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
         const jvmArgs = json.arguments?.jvm || [];
-        
+
         // Найти -p аргумент и извлечь пути библиотек
         const pIdx = jvmArgs.indexOf('-p');
         if (pIdx >= 0 && typeof jvmArgs[pIdx + 1] === 'string') {
@@ -226,10 +251,12 @@ async function preflightNeoForgeLibraries(rootPath, sendLog, sendDebug) {
  * @param {string} rootPath - Корневой путь установки
  * @param {Function} [sendDebug] - Функция дебаг-логирования
  */
-function ensureNeoForgeVersionJsonMerged(rootPath, sendDebug) {
-    const neoforgeVerId = `neoforge-${NEOFORGE_VERSION}`;
+function ensureNeoForgeVersionJsonMerged(rootPath, sendDebug, options = {}) {
+    const minecraftVersion = options.minecraftVersion || MC_VERSION;
+    const neoforgeVersion = options.neoforgeVersion || NEOFORGE_VERSION;
+    const neoforgeVerId = `neoforge-${neoforgeVersion}`;
     const neoforgeJsonPath = path.join(rootPath, 'versions', neoforgeVerId, `${neoforgeVerId}.json`);
-    const vanillaJsonPath = path.join(rootPath, 'versions', MC_VERSION, `${MC_VERSION}.json`);
+    const vanillaJsonPath = path.join(rootPath, 'versions', minecraftVersion, `${minecraftVersion}.json`);
 
     if (!fs.existsSync(neoforgeJsonPath) || !fs.existsSync(vanillaJsonPath)) return;
 
@@ -237,8 +264,8 @@ function ensureNeoForgeVersionJsonMerged(rootPath, sendDebug) {
         const neoJson = JSON.parse(fs.readFileSync(neoforgeJsonPath, 'utf8'));
         const vanillaJson = JSON.parse(fs.readFileSync(vanillaJsonPath, 'utf8'));
 
-        if (!neoJson.id.startsWith(MC_VERSION)) {
-            neoJson.id = `${MC_VERSION}-${neoJson.id}`;
+        if (!neoJson.id.startsWith(minecraftVersion)) {
+            neoJson.id = `${minecraftVersion}-${neoJson.id}`;
         }
 
         const existingNames = new Set((neoJson.libraries || []).map(l => l.name));
@@ -290,20 +317,20 @@ function ensureNeoForgeVersionJsonMerged(rootPath, sendDebug) {
         // Merge vanilla JVM arguments with NeoForge JVM arguments (crucial for -cp ${classpath})
         const vanillaJvmArgs = (vanillaJson.arguments && Array.isArray(vanillaJson.arguments.jvm)) ? vanillaJson.arguments.jvm : [];
         const neoJvmArgs = (neoJson.arguments && Array.isArray(neoJson.arguments.jvm)) ? neoJson.arguments.jvm : [];
-        
+
         // ВАЖНО: Нельзя дедуплицировать строковые аргументы (например, --add-opens), так как они идут парами.
         // Просто объединяем массивы, как это делает наследование в Minecraft.
         // Но чтобы избежать дублирования при повторных запусках (так как мы перезаписываем тот же файл),
         // проверим, содержит ли уже neoJvmArgs ванильные аргументы.
-        
+
         let mergedJvmArgs = [...neoJvmArgs];
         // Если в neoJvmArgs нет типичного ванильного аргумента, значит это чистый forge-файл
         const hasVanilla = neoJvmArgs.some(arg => typeof arg === 'string' && arg.includes('${natives_directory}'));
-        
+
         if (!hasVanilla) {
             mergedJvmArgs = [...vanillaJvmArgs, ...neoJvmArgs];
         }
-        
+
         neoJson.arguments.jvm = mergedJvmArgs;
 
         fs.writeFileSync(neoforgeJsonPath, JSON.stringify(neoJson, null, 2), 'utf8');
@@ -314,66 +341,55 @@ function ensureNeoForgeVersionJsonMerged(rootPath, sendDebug) {
 }
 
 /**
- * Убедиться, что валидный индекс ресурсов 1.21.1 существует и не пуст
+ * Убедиться, что индекс ресурсов выбранной версии существует и не пуст
  * @param {string} rootPath - Корневой путь установки
  * @param {Function} [sendLog] - Функция логирования
  * @param {object} [options] - Опции (signal и т.д.)
  */
 async function ensureAssetIndex(rootPath, sendLog, options = {}) {
     const signal = options.signal;
+    const minecraftVersion = options.minecraftVersion || MC_VERSION;
     if (signal && signal.aborted) {
         throw new Error('CANCELLED');
     }
 
-    const assetIndexDir = path.join(rootPath, 'assets', 'indexes');
-    if (!fs.existsSync(assetIndexDir)) {
-        fs.mkdirSync(assetIndexDir, { recursive: true });
+    const versionJsonPath = path.join(rootPath, 'versions', minecraftVersion, `${minecraftVersion}.json`);
+    const versionJson = JSON.parse(fs.readFileSync(versionJsonPath, 'utf8'));
+    const assetIndex = versionJson.assetIndex;
+    if (!assetIndex?.id || !assetIndex?.url) {
+        throw new Error(`В metadata Minecraft ${minecraftVersion} отсутствует assetIndex id или URL`);
     }
 
-    const indexFiles = [
-        path.join(assetIndexDir, '17.json'),
-        path.join(assetIndexDir, `${MC_VERSION}.json`),
-        path.join(assetIndexDir, `neoforge-${NEOFORGE_VERSION}.json`)
-    ];
-
-    let needDownload = false;
-    for (const f of indexFiles) {
-        if (!fs.existsSync(f)) {
-            needDownload = true;
-            break;
-        }
+    const assetIndexDir = path.join(rootPath, 'assets', 'indexes');
+    fs.mkdirSync(assetIndexDir, { recursive: true });
+    const indexPath = path.join(assetIndexDir, `${assetIndex.id}.json`);
+    let needDownload = !fs.existsSync(indexPath);
+    if (!needDownload) {
         try {
-            const content = JSON.parse(fs.readFileSync(f, 'utf8'));
-            if (!content.objects || Object.keys(content.objects).length === 0) {
-                needDownload = true;
-                break;
-            }
+            const content = JSON.parse(fs.readFileSync(indexPath, 'utf8'));
+            needDownload = !content.objects || Object.keys(content.objects).length === 0;
         } catch {
             needDownload = true;
-            break;
         }
     }
 
-    if (needDownload) {
-        if (sendLog) sendLog('Загрузка индекса ресурсов Minecraft 1.21.1...');
-        const assetIndexUrl = 'https://piston-meta.mojang.com/v1/packages/d1aa1019d308e98dcd0cc6ee5da5cf19569d8c81/17.json';
-        const tmpFile = path.join(assetIndexDir, '17.json.tmp');
-        try {
-            await downloadFile(assetIndexUrl, tmpFile, { timeoutMs: 30_000, signal });
-            if (signal && signal.aborted) throw new Error('CANCELLED');
-            const parsed = JSON.parse(fs.readFileSync(tmpFile, 'utf8'));
-            const jsonStr = JSON.stringify(parsed, null, 2);
-            
-            for (const f of indexFiles) {
-                fs.writeFileSync(f, jsonStr, 'utf8');
-            }
-            try { fs.unlinkSync(tmpFile); } catch {}
-            if (sendLog) sendLog('Индекс ресурсов Minecraft 1.21.1 готов.');
-        } catch (e) {
-            try { if (fs.existsSync(tmpFile)) fs.unlinkSync(tmpFile); } catch {}
-            if (e.message === 'CANCELLED' || signal?.aborted) throw new Error('CANCELLED');
-            throw e;
+    if (!needDownload) return;
+
+    if (sendLog) sendLog(`Загрузка индекса ресурсов Minecraft ${minecraftVersion} (${assetIndex.id})...`);
+    const tmpFile = `${indexPath}.tmp`;
+    try {
+        await downloadFile(assetIndex.url, tmpFile, { timeoutMs: 30_000, signal });
+        if (signal && signal.aborted) throw new Error('CANCELLED');
+        const parsed = JSON.parse(fs.readFileSync(tmpFile, 'utf8'));
+        if (!parsed.objects || Object.keys(parsed.objects).length === 0) {
+            throw new Error(`Загруженный asset index ${assetIndex.id} пуст или некорректен`);
         }
+        fs.renameSync(tmpFile, indexPath);
+        if (sendLog) sendLog(`Индекс ресурсов Minecraft ${minecraftVersion} готов.`);
+    } catch (e) {
+        try { if (fs.existsSync(tmpFile)) fs.unlinkSync(tmpFile); } catch { }
+        if (e.message === 'CANCELLED' || signal?.aborted) throw new Error('CANCELLED');
+        throw e;
     }
 }
 
@@ -386,7 +402,7 @@ function nameToPath(name) {
     if (parts.length < 3) return null;
     const [group, artifact, version, classifier] = parts;
     const groupPath = group.replace(/\./g, '/');
-    const filename = classifier 
+    const filename = classifier
         ? `${artifact}-${version}-${classifier}.jar`
         : `${artifact}-${version}.jar`;
     return `${groupPath}/${artifact}/${version}/${filename}`;
@@ -396,11 +412,12 @@ function nameToPath(name) {
  * Проверить SHA1 хеши и ZIP-структуру NeoForge библиотек, удалить повреждённые
  * @returns {Promise<number>} Количество удалённых повреждённых файлов
  */
-async function verifyNeoForgeLibraries(rootPath, sendLog, sendDebug) {
-    const neoforgeVerId = `neoforge-${NEOFORGE_VERSION}`;
+async function verifyNeoForgeLibraries(rootPath, sendLog, sendDebug, options = {}) {
+    const neoforgeVersion = options.neoforgeVersion || NEOFORGE_VERSION;
+    const neoforgeVerId = `neoforge-${neoforgeVersion}`;
     const jsonPath = path.join(rootPath, 'versions', neoforgeVerId, `${neoforgeVerId}.json`);
     if (!fs.existsSync(jsonPath)) return 0;
-    
+
     let json;
     try {
         json = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
@@ -411,7 +428,7 @@ async function verifyNeoForgeLibraries(rootPath, sendLog, sendDebug) {
     const libraries = json.libraries || [];
     const librariesDir = path.join(rootPath, 'libraries');
     let corrupted = 0;
-    
+
     for (const lib of libraries) {
         let relPath = lib.downloads?.artifact?.path;
         if (!relPath && lib.name) {
@@ -421,7 +438,7 @@ async function verifyNeoForgeLibraries(rootPath, sendLog, sendDebug) {
 
         const filePath = path.join(librariesDir, ...relPath.split('/'));
         if (!fs.existsSync(filePath)) continue; // Will be downloaded by MCLC
-        
+
         let isCorrupted = false;
 
         // 1. Check SHA1 if artifact.sha1 exists
@@ -434,7 +451,7 @@ async function verifyNeoForgeLibraries(rootPath, sendLog, sendDebug) {
                     hash.update(chunk);
                 }
                 const actual = hash.digest('hex');
-                
+
                 if (actual !== expectedSha1) {
                     if (sendDebug) sendDebug(`SHA1 mismatch: ${relPath} (expected ${expectedSha1}, got ${actual}). Deleting.`);
                     isCorrupted = true;
@@ -458,11 +475,11 @@ async function verifyNeoForgeLibraries(rootPath, sendLog, sendDebug) {
         }
 
         if (isCorrupted) {
-            try { fs.unlinkSync(filePath); } catch {}
+            try { fs.unlinkSync(filePath); } catch { }
             corrupted++;
         }
     }
-    
+
     return corrupted;
 }
 

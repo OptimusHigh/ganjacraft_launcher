@@ -1,7 +1,7 @@
 const https = require('https');
 const http = require('http');
 
-function authenticateYggdrasilOnce(authUrl, username, token, clientVersion = null, manifestHash = null, options = {}) {
+function authenticateYggdrasilOnce(authUrl, username, token, clientVersion = null, manifestHash = null, profileId = null, options = {}) {
     const signal = options.signal;
     return new Promise((resolve, reject) => {
         if (signal && signal.aborted) {
@@ -10,7 +10,7 @@ function authenticateYggdrasilOnce(authUrl, username, token, clientVersion = nul
 
         // Use Node's built-in crypto.randomUUID (available in Node 16+)
         const clientToken = require('crypto').randomUUID();
-        
+
         const payload = {
             agent: { name: "Minecraft", version: 1 },
             username: username,
@@ -20,6 +20,7 @@ function authenticateYggdrasilOnce(authUrl, username, token, clientVersion = nul
         };
         if (clientVersion) payload.clientVersion = clientVersion;
         if (manifestHash) payload.manifestHash = manifestHash;
+        if (profileId) payload.profileId = profileId;
 
         const data = JSON.stringify(payload);
 
@@ -63,14 +64,14 @@ function authenticateYggdrasilOnce(authUrl, username, token, clientVersion = nul
                         } else if (parsed.message) {
                             msg = parsed.message;
                         }
-                    } catch (e) {}
+                    } catch (e) { }
                     reject(new Error(msg));
                 }
             });
         });
 
         const onAbort = () => {
-            try { req.destroy(); } catch {}
+            try { req.destroy(); } catch { }
             reject(new Error('CANCELLED'));
         };
 
@@ -88,7 +89,7 @@ function authenticateYggdrasilOnce(authUrl, username, token, clientVersion = nul
     });
 }
 
-async function authenticateYggdrasil(authUrl, username, token, retries = 2, clientVersion = null, manifestHash = null, options = {}) {
+async function authenticateYggdrasil(authUrl, username, token, retries = 2, clientVersion = null, manifestHash = null, profileId = null, options = {}) {
     const signal = options.signal;
     const candidateUrls = Array.from(new Set([authUrl].filter(Boolean)));
 
@@ -99,7 +100,7 @@ async function authenticateYggdrasil(authUrl, username, token, retries = 2, clie
                 throw new Error('CANCELLED');
             }
             try {
-                return await authenticateYggdrasilOnce(url, username, token, clientVersion, manifestHash, options);
+                return await authenticateYggdrasilOnce(url, username, token, clientVersion, manifestHash, profileId, options);
             } catch (e) {
                 if (e.message === 'CANCELLED' || signal?.aborted) {
                     throw e;

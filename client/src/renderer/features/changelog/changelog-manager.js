@@ -23,7 +23,7 @@ export function isClientMod(raw) {
     if (!raw) return false;
     const str = String(raw).toLowerCase();
     if (str.startsWith('client_mods/') || str.startsWith('client-') || str.startsWith('client_')) return true;
-    
+
     const clientKeywords = [
         'sodium', 'iris', 'embeddium', 'oculus', 'rubidium', 'xaero', 'jei', 'rei', 'emi',
         'jade', 'waila', 'hud', 'appleskin', 'cloth', 'controlling', 'searchables',
@@ -121,7 +121,7 @@ function formatReleaseDate(dateStr, timestamp) {
                 const mins = String(d.getMinutes()).padStart(2, '0');
                 return `${day} ${month} ${year} • ${hours}:${mins}`;
             }
-        } catch {}
+        } catch { }
         return dateStr;
     }
 
@@ -141,11 +141,11 @@ function getLatestCompoundId() {
 /**
  * Загрузить историю изменений манифеста, релизов лаунчера и новостей
  */
-export async function loadChangelogHistory() {
+export async function loadChangelogHistory(profileId = window.__activeBuildProfileId) {
     try {
         const promises = [];
         if (window.api && window.api.getManifestHistory) {
-            promises.push(window.api.getManifestHistory().catch(() => ({ success: false, history: [] })));
+            promises.push(window.api.getManifestHistory(profileId).catch(() => ({ success: false, history: [] })));
         } else {
             promises.push(Promise.resolve({ success: false, history: [] }));
         }
@@ -352,7 +352,7 @@ export function renderChangelogList() {
  */
 function renderNewsCardHtml(item, isLatest) {
     const formattedDate = formatReleaseDate(item.created_at, item.timestamp);
-    
+
     let imageHtml = '';
     if (item.image_url) {
         imageHtml = `

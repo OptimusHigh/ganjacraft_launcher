@@ -32,7 +32,19 @@ function getDefaultConfig() {
         modsDefaultsVersion: 2,
 
         // General
+        // Keep installPath as the legacy alias for the vanilla profile.
         installPath: defaultInstallPath,
+        activeProfileId: 'vanilla',
+        profiles: {
+            vanilla: {
+                installPath: defaultInstallPath,
+                disabledMods: [],
+            },
+            ganj4craft5: {
+                installPath: path.join(defaultInstallPath, 'ganj4craft5'),
+                disabledMods: [],
+            },
+        },
         javaPath: '', // Empty = auto-detect
         memoryMin: '1G',
         memoryMax: '3G',
@@ -69,6 +81,19 @@ function normalizeLoadedConfig(config) {
     if (!Array.isArray(merged.disabledMods)) {
         merged.disabledMods = [];
     }
+
+    // Migrate the old single-install config without moving the existing vanilla files.
+    if (!merged.profiles || typeof merged.profiles !== 'object') merged.profiles = {};
+    if (!merged.profiles.vanilla || typeof merged.profiles.vanilla !== 'object') merged.profiles.vanilla = {};
+    if (!merged.profiles.ganj4craft5 || typeof merged.profiles.ganj4craft5 !== 'object') merged.profiles.ganj4craft5 = {};
+    merged.profiles.vanilla.installPath = merged.profiles.vanilla.installPath || merged.installPath;
+    merged.profiles.vanilla.disabledMods = Array.isArray(merged.profiles.vanilla.disabledMods)
+        ? merged.profiles.vanilla.disabledMods : merged.disabledMods;
+    merged.profiles.ganj4craft5.installPath = merged.profiles.ganj4craft5.installPath
+        || path.join(merged.profiles.vanilla.installPath, 'ganj4craft5');
+    if (!Array.isArray(merged.profiles.ganj4craft5.disabledMods)) merged.profiles.ganj4craft5.disabledMods = [];
+    merged.activeProfileId = merged.activeProfileId === 'ganj4craft5' ? 'ganj4craft5' : 'vanilla';
+    merged.installPath = merged.profiles.vanilla.installPath;
 
     // Migration for older configs (before modsDefaultsApplied existed).
     // We assume existing users already chose their mod state, so don't suddenly disable anything.
@@ -120,7 +145,7 @@ function loadConfig() {
             return normalized;
         }
     } catch (e) { console.error("Config load error:", e); }
-    
+
     return getDefaultConfig();
 }
 
@@ -141,4 +166,15 @@ function saveConfig(config) {
     }
 }
 
-module.exports = { loadConfig, saveConfig };
+function getProfileConfig(config, profileId = null) {
+    const normalized = normalizeLoadedConfig(config);
+    const id = profileId === 'ganj4craft5' ? 'ganj4craft5' : (profileId || normalized.activeProfileId || 'vanilla');
+    const profile = normalized.profiles[id] || normalized.profiles.vanilla;
+    return {
+        id,
+        installPath: profile.installPath,
+        disabledMods: Array.isArray(profile.disabledMods) ? profile.disabledMods : [],
+    };
+}
+
+module.exports = { loadConfig, saveConfig, getProfileConfig };

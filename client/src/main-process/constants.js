@@ -3,10 +3,46 @@
  * Все константы для main process
  */
 
-// Версии
+// Legacy NeoForge constants kept for compatibility with existing helpers.
 const NEOFORGE_VERSION = '21.1.247';
 const MC_VERSION = '1.21.1';
 const REQUIRED_JAVA_MAJOR = 21;
+
+// Client build profiles. Each profile is isolated by manifest, history and game directory.
+const BUILD_PROFILES = {
+    vanilla: {
+        id: 'vanilla',
+        name: 'GanjaCraft Vanilla',
+        shortName: 'VANILLA',
+        loader: 'fabric',
+        minecraftVersion: '26.3',
+        fabricLoaderVersion: '0.20.1',
+        javaMajor: 25,
+        manifestPath: 'vanilla/manifest.json',
+        historyPath: 'vanilla/manifest_history.json',
+        serverHost: 'vocalize-cove.gl.joinmc.link',
+        serverPort: 25565,
+        directoryName: 'vanilla',
+    },
+    ganj4craft5: {
+        id: 'ganj4craft5',
+        name: 'GANJ4CRAFT 5',
+        shortName: 'GANJ4CRAFT 5',
+        loader: 'neoforge',
+        minecraftVersion: '26.1.2',
+        neoforgeVersion: '26.1.2.126',
+        javaMajor: 25,
+        manifestPath: 'ganj4craft5/manifest.json',
+        historyPath: 'ganj4craft5/manifest_history.json',
+        serverHost: 'vocalize-cove.gl.joinmc.link',
+        serverPort: 25578,
+        directoryName: 'ganj4craft5',
+    },
+};
+
+function getBuildProfile(profileId) {
+    return BUILD_PROFILES[profileId] || BUILD_PROFILES.vanilla;
+}
 
 const path = require('path');
 const fs = require('fs');
@@ -37,9 +73,12 @@ const MIRROR_BASE = `${BASE_URL}/mirror`;
 const FILES_BASE = `${BASE_URL}/files`;
 const API_BASE = `${BASE_URL}/api`;
 
-const MANIFEST_URL = `${FILES_BASE}/manifest.json`;
-const MANIFEST_HISTORY_URL = `${FILES_BASE}/manifest_history.json`;
+const MANIFEST_URL = `${FILES_BASE}/vanilla/manifest.json`;
+const MANIFEST_HISTORY_URL = `${FILES_BASE}/vanilla/manifest_history.json`;
 const NEOFORGE_INSTALLER_URL = `https://maven.neoforged.net/releases/net/neoforged/neoforge/${NEOFORGE_VERSION}/neoforge-${NEOFORGE_VERSION}-installer.jar`;
+function getNeoForgeInstallerUrl(version = NEOFORGE_VERSION) {
+    return `https://maven.neoforged.net/releases/net/neoforged/neoforge/${version}/neoforge-${version}-installer.jar`;
+}
 const AUTHLIB_INJECTOR_URL = `https://github.com/yushijinhun/authlib-injector/releases/download/v1.2.5/authlib-injector-1.2.5.jar`;
 const YGGDRASIL_AUTH_URL = `${API_BASE}/yggdrasil/authserver/authenticate`;
 
@@ -132,6 +171,10 @@ const JVM_OPTIMIZATION_ARGS = [
 ];
 
 module.exports = {
+    // Build profiles
+    BUILD_PROFILES,
+    getBuildProfile,
+
     // Versions
     CLIENT_VERSION,
     NEOFORGE_VERSION,
@@ -140,11 +183,13 @@ module.exports = {
 
     // URLs
     BASE_URL,
+    FILES_BASE,
     SITE_URL,
     API_BASE,
     DISCORD_CLIENT_ID,
     MANIFEST_URL,
     MANIFEST_HISTORY_URL,
+    getNeoForgeInstallerUrl,
     NEOFORGE_INSTALLER_URL,
     AUTHLIB_INJECTOR_URL,
     YGGDRASIL_AUTH_URL,

@@ -68,7 +68,7 @@ export async function savePendingConfigs() {
 export function cancelPendingConfigs() {
     if (pendingConfigChanges.size === 0) return;
     pendingConfigChanges.clear();
-    
+
     // Пересобираем правую панель чтобы вернуть исходные значения
     if (activeConfigFile) {
         const groupsMap = getFilteredGroups();
@@ -85,15 +85,15 @@ export function cancelPendingConfigs() {
 /**
  * Загрузить список конфигураций
  */
-export async function loadConfigsList() {
+export async function loadConfigsList(profileId = window.__activeBuildProfileId) {
     const gridContainer = dom.get('configs-grid');
     if (!gridContainer) return;
 
     gridContainer.innerHTML = '<div class="unified-loading"><span class="unified-spinner"></span>Загрузка конфигураций...</div>';
 
     try {
-        allConfigs = await window.api.getGameConfigs();
-        
+        allConfigs = await window.api.getGameConfigs(profileId);
+
         if (!allConfigs || allConfigs.length === 0) {
             gridContainer.innerHTML = '<div class="unified-empty"><div class="unified-empty-icon">⚠️</div><div class="unified-empty-text">Конфигурации не найдены</div></div>';
             return;
@@ -127,9 +127,9 @@ function getFilteredGroups() {
         if (!query) return true;
         // Поиск по ключу, комментарию, имени файла и пути (включая папку)
         return (item.key && item.key.toLowerCase().includes(query)) ||
-               (item.comment && item.comment.toLowerCase().includes(query)) ||
-               (item.fileName && item.fileName.toLowerCase().includes(query)) ||
-               (item.filePath && item.filePath.toLowerCase().includes(query));
+            (item.comment && item.comment.toLowerCase().includes(query)) ||
+            (item.fileName && item.fileName.toLowerCase().includes(query)) ||
+            (item.filePath && item.filePath.toLowerCase().includes(query));
     });
 
     // Собираем уникальные filePath → определяем у каких fileName есть дубликаты

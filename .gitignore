@@ -27,3 +27,10 @@ client/build_debug.log
 # Mirror collection artifacts
 mirror/
 cache/
+
+# Release & deployment artifacts
+*.tar
+*-production*.json
+*-release-files*.txt
+sync-env.txt
+release_sync.py

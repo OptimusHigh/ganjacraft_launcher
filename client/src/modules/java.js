@@ -5,9 +5,10 @@ const { downloadFile } = require('./updater');
 
 const REQUIRED_JAVA_MAJOR = 21;
 
-// Adoptium JRE 21 for Windows and Linux x64
-const JAVA_URL_WIN = 'https://api.adoptium.net/v3/binary/latest/21/ga/windows/x64/jre/hotspot/normal/eclipse';
-const JAVA_URL_LINUX = 'https://api.adoptium.net/v3/binary/latest/21/ga/linux/x64/jre/hotspot/normal/eclipse';
+function getJavaDownloadUrl(javaMajor, platform) {
+    const os = platform === 'win32' ? 'windows' : 'linux';
+    return `https://api.adoptium.net/v3/binary/latest/${javaMajor}/ga/${os}/x64/jre/hotspot/normal/eclipse`;
+}
 
 function preferJavaw(javaCommandOrPath) {
     if (process.platform !== 'win32') return javaCommandOrPath;
@@ -21,7 +22,7 @@ function preferJavaw(javaCommandOrPath) {
         const candidate = javaCommandOrPath.replace(/java\.exe$/i, 'javaw.exe');
         try {
             if (fs.existsSync(candidate)) return candidate;
-        } catch {}
+        } catch { }
     }
     return javaCommandOrPath;
 }
@@ -146,7 +147,7 @@ function getJavaVersionInfo(javaCommandOrPath, { timeoutMs = 5000 } = {}) {
         const timer = setTimeout(() => {
             if (settled) return;
             settled = true;
-            try { child.kill(); } catch {}
+            try { child.kill(); } catch { }
             resolve(null);
         }, timeoutMs);
 
@@ -170,6 +171,7 @@ function getJavaVersionInfo(javaCommandOrPath, { timeoutMs = 5000 } = {}) {
 async function checkAndDownloadJava(dataDir, sendLog, options = {}) {
     const signal = options.signal;
     const activeChildProcesses = options.activeChildProcesses;
+    const requiredJavaMajor = Number(options.javaMajor) || REQUIRED_JAVA_MAJOR;
 
     if (signal && signal.aborted) {
         throw new Error('CANCELLED');
@@ -177,7 +179,7 @@ async function checkAndDownloadJava(dataDir, sendLog, options = {}) {
 
     const runtimeDir = path.join(dataDir, 'runtime');
     const javaDir = path.join(runtimeDir, 'java');
-    
+
     // 1. Check if local java exists
     const javaExec = process.platform === 'win32'
         ? path.join(javaDir, 'bin', 'java.exe')
@@ -189,25 +191,25 @@ async function checkAndDownloadJava(dataDir, sendLog, options = {}) {
 
     if (fs.existsSync(javaExec)) {
         const info = await getJavaVersionInfo(preferredLocalExec);
-        if (info && info.major >= 21 && info.major <= 22) {
-            sendLog('Используется локальная Java 21: ' + preferredLocalExec);
+        if (info && info.major >= requiredJavaMajor) {
+            sendLog(`Используется локальная Java ${info.major}: ${preferredLocalExec}`);
             return preferredLocalExec;
         }
-        sendLog(`Локальная Java найдена (Java ${info ? info.major : '?'}), но для NeoForge 1.21.1 требуется Java 21. Скачивание актуальной Java 21...`);
+        sendLog(`Локальная Java найдена (Java ${info ? info.major : '?'}), но требуется Java ${requiredJavaMajor}+. Скачивание актуальной Java ${requiredJavaMajor}...`);
     }
 
     if (signal && signal.aborted) {
         throw new Error('CANCELLED');
     }
 
-    // 2. Check for System Java (must be Java 21 or 22 for NeoForge 1.21.1 compatibility)
+    // 2. Check for System Java (must satisfy the selected profile requirement)
     try {
         const systemJava = await checkSystemJava();
-        if (systemJava && systemJava.major >= 21 && systemJava.major <= 22) {
+        if (systemJava && systemJava.major >= requiredJavaMajor) {
             sendLog(`Найдена системная Java (подходит): Java ${systemJava.major}`);
             return systemJava.command; // typically 'java'
-        } else if (systemJava && systemJava.major > 22) {
-            sendLog(`Системная Java ${systemJava.major} несовместима с NeoForge 1.21.1 (требуется Java 21). Скачивание стабильной Java 21 JRE...`);
+        } else if (systemJava) {
+            sendLog(`Системная Java ${systemJava.major} ниже требуемой Java ${requiredJavaMajor}. Скачивание Java ${requiredJavaMajor} JRE...`);
         }
     } catch (e) {
         // Ignore error, proceed to download
@@ -218,13 +220,13 @@ async function checkAndDownloadJava(dataDir, sendLog, options = {}) {
     }
 
     // 3. Download if not found (or system Java is too old)
-    sendLog(`Подходящая Java не найдена. Скачивание JRE ${REQUIRED_JAVA_MAJOR}...`);
-    
+    sendLog(`Подходящая Java не найдена. Скачивание JRE ${requiredJavaMajor}...`);
+
     if (!fs.existsSync(runtimeDir)) fs.mkdirSync(runtimeDir, { recursive: true });
 
     const isWin = process.platform === 'win32';
     const zipPath = path.join(runtimeDir, isWin ? 'java.zip' : 'java.tar.gz');
-    const url = isWin ? JAVA_URL_WIN : JAVA_URL_LINUX;
+    const url = getJavaDownloadUrl(requiredJavaMajor, process.platform);
 
     try {
         await downloadFile(url, zipPath, { signal });
@@ -241,12 +243,12 @@ async function checkAndDownloadJava(dataDir, sendLog, options = {}) {
             const fullPath = path.join(runtimeDir, f);
             return fs.statSync(fullPath).isDirectory() && f !== 'java';
         });
-        
+
         if (extractedFolder) {
             const fullExtractedPath = path.join(runtimeDir, extractedFolder);
             // Rename to 'java'
             if (fs.existsSync(javaDir)) fs.rmSync(javaDir, { recursive: true, force: true });
-            
+
             // Retry loop for rename (sometimes antivirus or file locks delay it)
             let retries = 3;
             while (retries > 0) {
@@ -266,11 +268,11 @@ async function checkAndDownloadJava(dataDir, sendLog, options = {}) {
 
         if (fs.existsSync(javaExec)) {
             if (!isWin) {
-                try { fs.chmodSync(javaExec, 0o755); } catch {}
+                try { fs.chmodSync(javaExec, 0o755); } catch { }
             }
             const info = await getJavaVersionInfo(javaExec);
-            if (!info || info.major < REQUIRED_JAVA_MAJOR) {
-                throw new Error(`Скачанная Java имеет неподходящую версию. Требуется Java ${REQUIRED_JAVA_MAJOR}+.`);
+            if (!info || info.major < requiredJavaMajor) {
+                throw new Error(`Скачанная Java имеет неподходящую версию. Требуется Java ${requiredJavaMajor}+.`);
             }
             return javaExec;
         } else {
@@ -278,12 +280,12 @@ async function checkAndDownloadJava(dataDir, sendLog, options = {}) {
         }
     } catch (e) {
         if (e.message === 'CANCELLED' || signal?.aborted) {
-            if (fs.existsSync(zipPath)) try { fs.unlinkSync(zipPath); } catch {}
+            if (fs.existsSync(zipPath)) try { fs.unlinkSync(zipPath); } catch { }
             throw new Error('CANCELLED');
         }
         sendLog('Ошибка при установке Java: ' + e.message);
         // Cleanup on failure
-        if (fs.existsSync(zipPath)) try { fs.unlinkSync(zipPath); } catch {}
+        if (fs.existsSync(zipPath)) try { fs.unlinkSync(zipPath); } catch { }
         throw e;
     }
 }
@@ -335,9 +337,9 @@ function extractZip(zipPath, destDir, options = {}) {
                 if (process.platform === 'win32') {
                     try {
                         require('child_process').execSync(`taskkill /F /T /PID ${child.pid}`, { stdio: 'ignore' });
-                    } catch {}
+                    } catch { }
                 }
-                try { child.kill('SIGKILL'); } catch {}
+                try { child.kill('SIGKILL'); } catch { }
             }
             reject(new Error('CANCELLED'));
         };

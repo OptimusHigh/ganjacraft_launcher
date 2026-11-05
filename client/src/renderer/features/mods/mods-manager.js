@@ -8,6 +8,7 @@ import { FILES_BASE } from '../../constants.js';
 import { MOD_GROUPS, CATEGORY_ORDER } from './mod-groups.js';
 
 let cachedManifest = null;
+let cachedManifestProfileId = null;
 let searchQuery = '';
 let allGroupItems = [];
 
@@ -47,7 +48,7 @@ function isModDisabled(filePath, disabledMods = []) {
         }
 
         const entryFileName = normDisabled.split('/').pop().toLowerCase();
-        const matchingGroup = MOD_GROUPS.find(g => 
+        const matchingGroup = MOD_GROUPS.find(g =>
             g.files && g.files.some(p => entryFileName.includes(p.toLowerCase()))
         );
         if (matchingGroup && matchingGroup.files) {
@@ -65,6 +66,9 @@ function isModDisabled(filePath, disabledMods = []) {
  * Загрузить список модов
  */
 export async function loadModsList(disabledMods = [], config = {}, forceReload = false) {
+    const profileId = config.activeProfileId || window.__activeBuildProfileId || 'vanilla';
+    const profileChanged = cachedManifestProfileId !== profileId;
+    forceReload = forceReload || profileChanged;
     const gridContainer = dom.get('mods-grid');
     if (!gridContainer) return;
 
@@ -91,15 +95,16 @@ export async function loadModsList(disabledMods = [], config = {}, forceReload =
         gridContainer.innerHTML = '<div class="unified-loading"><span class="unified-spinner"></span>Загрузка модов...</div>';
     }
 
-    cachedManifest = await window.api.getManifest();
+    cachedManifest = await window.api.getManifest(profileId);
+    cachedManifestProfileId = profileId;
     if (!cachedManifest) {
         gridContainer.innerHTML = '<div class="unified-empty"><div class="unified-empty-icon">⚠️</div><div class="unified-empty-text">Не удалось загрузить манифест модов</div></div>';
         return;
     }
 
-    const allFiles = cachedManifest.files.filter(f => 
-        f.optional && 
-        f.path.startsWith('mods/') && 
+    const allFiles = cachedManifest.files.filter(f =>
+        f.optional &&
+        f.path.startsWith('mods/') &&
         f.path.endsWith('.jar')
     );
 
@@ -306,8 +311,8 @@ export function renderModsGrid() {
     const filteredMods = allGroupItems.filter(item => {
         if (!query) return true;
         return (item.name && item.name.toLowerCase().includes(query)) ||
-               (item.shortName && item.shortName.toLowerCase().includes(query)) ||
-               (item.description && item.description.toLowerCase().includes(query));
+            (item.shortName && item.shortName.toLowerCase().includes(query)) ||
+            (item.description && item.description.toLowerCase().includes(query));
     });
 
     const groupsMap = {};
@@ -515,7 +520,7 @@ export function renderModsGrid() {
         `;
 
         const catalogContent = fullListCard.querySelector('.category-content');
-        
+
         // Делегирование ссылок Modrinth
         catalogContent.addEventListener('click', (e) => {
             const btn = e.target.closest('button[data-url]');
@@ -577,11 +582,11 @@ let resolvedModrinthUrls = {};
 
 async function resolveModrinthProjectUrlsAsync(hashes) {
     if (!hashes || hashes.length === 0) return;
-    
+
     try {
         const data = await window.api.resolveModrinth(hashes);
         if (!data || Object.keys(data).length === 0) return;
-        
+
         let hasUpdates = false;
         for (const [hash, info] of Object.entries(data)) {
             if (info && info.projectId) {
@@ -589,13 +594,13 @@ async function resolveModrinthProjectUrlsAsync(hashes) {
                 hasUpdates = true;
             }
         }
-        
+
         if (hasUpdates && cachedCatalogData) {
             cachedCatalogData.forEach(item => {
                 if (item.hash && resolvedModrinthUrls[item.hash] && !item.hasFixedModrinthUrl) {
                     item.modrinthUrl = resolvedModrinthUrls[item.hash];
                     item.hasFixedModrinthUrl = true;
-                    
+
                     // Update live DOM button without re-rendering everything
                     const btn = document.querySelector(`button[data-hash="${item.hash}"]`);
                     if (btn) {
@@ -660,13 +665,13 @@ function renderLinksCatalogIntoContainer(manifest, contentContainer, query = '')
                 .replace(/[-_]\d+.*$/i, '');
             cleanName = cleanName.charAt(0).toUpperCase() + cleanName.slice(1);
 
-            const groupMatch = MOD_GROUPS.find(g => 
+            const groupMatch = MOD_GROUPS.find(g =>
                 g.files && g.files.some(p => fileName.toLowerCase().includes(p.toLowerCase()))
             );
 
             const downloadUrl = file.url || `${FILES_BASE}/${file.path.replace(/^\/+/, '')}`;
 
-            const modrinthUrl = groupMatch?.modrinthSlug 
+            const modrinthUrl = groupMatch?.modrinthSlug
                 ? `https://modrinth.com/mod/${groupMatch.modrinthSlug}`
                 : `https://modrinth.com/mods?q=${encodeURIComponent(groupMatch ? groupMatch.name : cleanName)}`;
 
@@ -675,9 +680,9 @@ function renderLinksCatalogIntoContainer(manifest, contentContainer, query = '')
                 cleanName: groupMatch ? groupMatch.name : cleanName,
                 isOptional: !!file.optional,
                 downloadUrl,
-                modrinthUrl: (file.hash && resolvedModrinthUrls[file.hash.toLowerCase()]) 
-                             ? resolvedModrinthUrls[file.hash.toLowerCase()] 
-                             : modrinthUrl,
+                modrinthUrl: (file.hash && resolvedModrinthUrls[file.hash.toLowerCase()])
+                    ? resolvedModrinthUrls[file.hash.toLowerCase()]
+                    : modrinthUrl,
                 hash: file.hash ? file.hash.toLowerCase() : null,
                 hasFixedModrinthUrl: !!groupMatch?.modrinthSlug || !!(file.hash && resolvedModrinthUrls[file.hash.toLowerCase()])
             };
@@ -689,7 +694,7 @@ function renderLinksCatalogIntoContainer(manifest, contentContainer, query = '')
             const hashesToResolve = cachedCatalogData
                 .filter(item => item.hash && !item.hasFixedModrinthUrl)
                 .map(item => item.hash);
-            
+
             if (hashesToResolve.length > 0) {
                 resolveModrinthProjectUrlsAsync(hashesToResolve);
             }
@@ -745,9 +750,9 @@ export function setAllModsState(isChecked) {
     }
 }
 
-export function updateModsCounter() {}
-export function updateCategorySidebar() {}
-export function updateSidebarStats() {}
+export function updateModsCounter() { }
+export function updateCategorySidebar() { }
+export function updateSidebarStats() { }
 
 export function initModsListeners(onChangeCallback) {
     const grid = dom.get('mods-grid');

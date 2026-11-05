@@ -6,9 +6,66 @@
 import { dom } from '../../utils/dom.js';
 import { API_BASE } from '../../constants.js';
 
-const SERVER_ADDRESS = 'vocalize-cove.gl.joinmc.link';
+const DEFAULT_SERVER_HOST = 'vocalize-cove.gl.joinmc.link';
 const STATUS_UPDATE_INTERVAL = 60000; // 60 секунд
 let statusInterval = null;
+let activeProfile = {
+    id: 'vanilla',
+    name: 'GanjaCraft Vanilla',
+    serverHost: DEFAULT_SERVER_HOST,
+    serverPort: 25565,
+};
+
+export function setServerProfile(profile) {
+    if (!profile || !profile.id) return;
+    activeProfile = {
+        id: profile.id,
+        name: profile.name || profile.id,
+        serverHost: profile.serverHost || DEFAULT_SERVER_HOST,
+        serverPort: Number(profile.serverPort) || 25565,
+    };
+}
+
+export async function initBuildProfileSelector(config = {}) {
+    if (!window.api?.getBuildProfiles) return;
+    const profiles = await window.api.getBuildProfiles();
+    if (!Array.isArray(profiles) || profiles.length === 0) return;
+
+    let selector = document.getElementById('build-profile-selector');
+    if (!selector) {
+        selector = document.createElement('select');
+        selector.id = 'build-profile-selector';
+        selector.title = 'Игровая сборка';
+        selector.style.cssText = 'margin-left:8px;background:rgba(10,10,10,.75);color:#fff;border:1px solid rgba(57,255,20,.45);border-radius:4px;padding:3px 6px;font-size:11px;';
+        const widget = dom.get('server-status-widget');
+        widget?.appendChild(selector);
+    }
+
+    selector.replaceChildren(...profiles.map(profile => {
+        const option = document.createElement('option');
+        option.value = profile.id;
+        option.textContent = profile.shortName || profile.name || profile.id;
+        return option;
+    }));
+    selector.value = config.activeProfileId || 'vanilla';
+
+    const selected = profiles.find(profile => profile.id === selector.value) || profiles[0];
+    setServerProfile(selected);
+    window.__activeBuildProfileId = selected.id;
+    selector.onchange = async () => {
+        const profile = profiles.find(item => item.id === selector.value);
+        if (!profile) return;
+
+        const saved = await window.api.setActiveProfile(profile.id);
+        const selectedProfile = saved || profile;
+        setServerProfile(selectedProfile);
+        window.__activeBuildProfileId = selectedProfile.id;
+        window.dispatchEvent(new CustomEvent('build-profile-changed', {
+            detail: selectedProfile,
+        }));
+        await updateServerStatus();
+    };
+}
 
 /**
  * Создать/обновить тултип с именами игроков
@@ -84,9 +141,13 @@ export async function updateServerStatus() {
         let maxCount = 0;
         let list = [];
 
+        const serverAddress = activeProfile.serverPort === 25565
+            ? activeProfile.serverHost
+            : `${activeProfile.serverHost}:${activeProfile.serverPort}`;
+
         // 1. Пробуем mcstatus.io (отлично поддерживает SRV и прокси-домены joinmc.link)
         try {
-            const resIo = await fetch(`https://api.mcstatus.io/v2/status/java/${SERVER_ADDRESS}`, {
+            const resIo = await fetch(`https://api.mcstatus.io/v2/status/java/${encodeURIComponent(serverAddress)}`, {
                 headers: { 'Cache-Control': 'no-cache' }
             });
             if (resIo.ok) {
@@ -105,7 +166,7 @@ export async function updateServerStatus() {
         // 2. Fallback на mcsrvstat.us если mcstatus.io недоступен
         if (!isOnline) {
             try {
-                const resSrv = await fetch(`https://api.mcsrvstat.us/3/${SERVER_ADDRESS}`, {
+                const resSrv = await fetch(`https://api.mcsrvstat.us/3/${encodeURIComponent(serverAddress)}`, {
                     headers: { 'Cache-Control': 'no-cache' }
                 });
                 if (resSrv.ok) {
@@ -146,7 +207,7 @@ export async function updateServerStatus() {
             }
 
             if (liveStatusText) {
-                liveStatusText.textContent = 'СЕРВЕР В СЕТИ';
+                liveStatusText.textContent = `СЕРВЕР В СЕТИ · ${activeProfile.name}`;
             }
             if (livePlayerCount) {
                 livePlayerCount.textContent = `${onlineCount} / ${maxCount}`;
@@ -220,7 +281,7 @@ export async function updateServerStatus() {
                 mainLayout.classList.add('empty-card');
             }
             if (liveStatusText) {
-                liveStatusText.textContent = 'ОФФЛАЙН';
+                liveStatusText.textContent = `ОФФЛАЙН · ${activeProfile.name}`;
             }
             if (livePlayerCount) {
                 livePlayerCount.textContent = '0 / 0';
