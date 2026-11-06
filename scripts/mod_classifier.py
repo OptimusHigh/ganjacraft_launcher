@@ -399,7 +399,7 @@ def categorize_mod(m: dict, status: str) -> str:
     ui_keywords = [
         "jei", "emi", "semi", "jer", "justenoughresources", "jade", "appleskin",
         "betteradvancements", "controlling", "searchables", "shulkerboxtooltip",
-        "minihud", "modmenu", "inventoryprofilesnext", "libipn", "diorama",
+        "minihud", "malilib", "modmenu", "inventoryprofilesnext", "libipn", "diorama",
         "xray", "configsearch", "better-advanced-tooltips"
     ]
     if any(k in mod_id or k in fname for k in ui_keywords):
@@ -409,7 +409,7 @@ def categorize_mod(m: dict, status: str) -> str:
     lib_keywords = [
         "fabric-api", "fabric-language-kotlin", "kotlinforforge", "cloth-config", "cloth_config",
         "puzzleslib", "balm", "fzzy_config", "mezz_config", "zconfig", "yet_another_config_lib",
-        "malilib", "matlib", "placebo", "cupboard", "cristellib", "jamlib", "glitchcore",
+        "matlib", "placebo", "cupboard", "cristellib", "jamlib", "glitchcore",
         "wunderlib", "bclib", "lithostitched", "terrablender", "rhino", "mantle", "curios"
     ]
     if any(k in mod_id or k in fname for k in lib_keywords):
@@ -555,9 +555,16 @@ def extract_existing_resourcepacks_and_shaders(existing_js_path: str) -> List[di
         with open(existing_js_path, "r", encoding="utf-8") as f:
             text = f.read()
 
+        m = re.search(r'export const MOD_GROUPS = (\[.*?\]);', text, re.DOTALL)
+        if m:
+            data = json.loads(m.group(1))
+            packs = [x for x in data if x.get("category") in ("Ресурспаки", "Шейдеры")]
+            if packs:
+                return packs
+
+        # Резервный поиск регуляркой для старых форматов JS
         pattern = re.compile(r'(\{[^{}]*?category:\s*[\'"](?:Ресурспаки|Шейдеры)[\'"][^{}]*?\})', re.DOTALL)
         matches = pattern.findall(text)
-
         parsed = []
         for block in matches:
             item: dict = {}
@@ -593,6 +600,13 @@ def generate_launcher_mod_groups_js(active_mods: List[dict], output_path: str) -
     unique_groups: Dict[str, dict] = {}
 
     for item in active_mods:
+        # В MOD_GROUPS лаунчера со свитчами идут СТРОГО клиентские моды!
+        # Контентные моды (both), библиотеки и серверные (server-only) ни в коем случае нельзя отключать!
+        if item["status"] not in ("client-only", "client-optional"):
+            continue
+        if item["category"] in ("Библиотеки", "Контент"):
+            continue
+
         entry = build_mod_group_entry(item, by_id)
         gid = entry["id"]
         if gid not in unique_groups:
@@ -619,8 +633,6 @@ def generate_launcher_mod_groups_js(active_mods: List[dict], output_path: str) -
         "Камера и Управление",
         "Строительство",
         "Интерфейс",
-        "Контент",
-        "Библиотеки",
         "Ресурспаки",
         "Шейдеры",
         "Остальное"

@@ -425,8 +425,6 @@ function getCategoryIconId(catName) {
         case 'КАМЕРА': return '#icon-hide';
         case 'СТРОИТЕЛЬСТВО': return '#icon-folder';
         case 'ИНТЕРФЕЙС': return '#icon-wrench';
-        case 'КОНТЕНТ': return '#icon-game';
-        case 'БИБЛИОТЕКИ': return '#icon-folder';
         case 'РЕСУРСПАКИ': return '#icon-appearance';
         case 'ШЕЙДЕРЫ': return '#icon-smoke';
         default: return '#icon-game';
