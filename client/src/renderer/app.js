@@ -82,9 +82,8 @@ import {
     initConsoleActions
 } from './features/console/index.js';
 
-import { loadNews } from './features/news/index.js';
 import { startStatusChecker, initBuildProfileSelector } from './features/server-status/index.js';
-import { initChangelog, loadChangelogHistory, isChangelogOpen, closeChangelogScreen } from './features/changelog/index.js';
+import { initChangelog, loadChangelogHistory, isChangelogOpen, closeChangelogScreen, openChangelogScreen } from './features/changelog/index.js';
 
 // === Application State ===
 let currentConfig = {};
@@ -285,6 +284,10 @@ async function init() {
     initConsoleActions();
     initSettingsButton();
     initChangelog();
+    const dashboardChangelogButton = dom.get('dashboard-open-changelog');
+    if (dashboardChangelogButton) {
+        dashboardChangelogButton.addEventListener('click', () => openChangelogScreen());
+    }
     initWardrobeModal();
     initAuthHandlers();
     initProgressHandlers();
@@ -324,38 +327,52 @@ async function init() {
         }
     } catch (_) { }
 
-    updateLoaderStatus(80, 'Загрузка манифеста модов...');
-    // Initialize the profile selector before loading profile-dependent data.
-    await initBuildProfileSelector(currentConfig);
-    const activeProfileId = window.__activeBuildProfileId || currentConfig.activeProfileId || 'vanilla';
+    updateLoaderStatus(80, 'Загрузка данных сборки...');
+    const initializeProfileSelector = async () => {
+        const isAuthenticated = Boolean(localStorage.getItem('auth_user') && localStorage.getItem('auth_token'));
+        if (!isAuthenticated) return;
+        return initBuildProfileSelector(currentConfig);
+    };
+
+    // Auth completion can happen after initial app startup (OTP/password flow).
+    window.addEventListener('auth-ready', () => {
+        initializeProfileSelector().catch(error => {
+            console.error('[Profile] Failed to initialize selector after authentication:', error);
+        });
+    });
+    await initializeProfileSelector();
+    const activeProfileId = window.__activeBuildProfileId || '';
     const activeProfileConfig = currentConfig.profiles?.[activeProfileId] || currentConfig;
 
-    // 5. Предзагрузка модов в память для мгновенного открытия в настройках
-    console.log('[INIT STEP 6] Loading mods list...');
-    await loadModsList(activeProfileConfig.disabledMods || [], {
-        ...currentConfig,
-        activeProfileId,
-    });
-
-    // Предзагрузка конфигураций выбранной сборки
-    console.log('[INIT STEP 7] Loading configs list...');
-    await loadConfigsList(activeProfileId);
-
+    console.log('[INIT STEP 6] Loading profile mods and configs...');
+    if (activeProfileId) {
+        await Promise.all([
+            loadModsList(activeProfileConfig.disabledMods || [], {
+                ...currentConfig,
+                activeProfileId,
+            }),
+            loadConfigsList(activeProfileId),
+        ]);
+    } else {
+        await loadModsList([], { ...currentConfig, activeProfileId: '' });
+    }
     captureInitialSettingsState();
 
     window.addEventListener('build-profile-changed', async (event) => {
         if (profileChangeReloading) return;
         profileChangeReloading = true;
         try {
-            const profileId = event.detail?.id || window.__activeBuildProfileId || 'vanilla';
+            const profileId = event.detail?.id || window.__activeBuildProfileId || '';
+            if (!profileId) {
+                return;
+            }
             const profileConfig = currentConfig.profiles?.[profileId] || currentConfig;
             currentConfig = {
                 ...currentConfig,
                 activeProfileId: profileId,
             };
             setCurrentConfig(currentConfig);
-            // Settings path is profile-specific. Refresh it immediately so a
-            // profile switch cannot leave the previous profile's root visible.
+            // Shared install root is identical across profiles; refresh profile-owned settings state.
             populateSettingsFields(currentConfig);
             captureInitialSettingsState();
             await loadModsList(profileConfig.disabledMods || [], currentConfig, true);
@@ -368,16 +385,12 @@ async function init() {
         }
     });
 
-    updateLoaderStatus(90, 'Загрузка новостей и сервера...');
-    // 6. Load profile changelog, news and start status checker
-    await Promise.allSettled([
-        loadNews(),
-        loadChangelogHistory(activeProfileId),
-        new Promise(resolve => {
-            startStatusChecker();
-            setTimeout(resolve, 150);
-        })
-    ]);
+    updateLoaderStatus(90, 'Загрузка обновлений и статуса серверов...');
+    // Start network work after the interactive shell is visible; it must not block first paint.
+    requestAnimationFrame(() => {
+        loadChangelogHistory(window.__activeBuildProfileId).catch(error => console.warn('[CHANGELOG] Deferred load failed:', error));
+        startStatusChecker();
+    });
 
     updateLoaderStatus(100, 'Готово!');
     logToConsole('[LAUNCHER] Initialization complete. All modules pre-loaded.');

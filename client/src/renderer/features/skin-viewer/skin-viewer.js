@@ -12,6 +12,8 @@ const CAPE_BASE_URL = `${API_BASE}/capes`;
 
 let skinViewer3d = null;
 let currentUsername = '';
+let activeBuildId = window.__activeBuildProfileId || '';
+let profileAppearanceHandler = null;
 let currentMode = localStorage.getItem(STORAGE_KEY_MODE) || '3d'; // '3d' | '2d' | 'off'
 let mouseMoveHandler = null;
 
@@ -48,9 +50,18 @@ export async function initSkinViewer(username) {
     // Восстанавливаем сохраненный режим
     currentMode = localStorage.getItem(STORAGE_KEY_MODE) || '3d';
     console.log('[SKIN-VIEWER] Current skin mode:', currentMode);
+    if (!profileAppearanceHandler) {
+        profileAppearanceHandler = (event) => {
+            activeBuildId = event.detail?.id || '';
+            equipmentManager.applyBuildAppearance(activeBuildId);
+            refreshCharacterEquipment();
+        };
+        window.addEventListener('build-profile-changed', profileAppearanceHandler);
+    }
+    equipmentManager.applyBuildAppearance(activeBuildId);
     await applySkinMode(currentMode);
     setupMouseTracking();
-    setupWindowRestoreRandomizer();
+    setupProfileAppearanceListener();
     console.log('[SKIN-VIEWER] initSkinViewer completed for:', username);
 }
 
@@ -137,35 +148,6 @@ async function render3dSkin(username) {
             skinViewer3d.animation = new skinview3d.FunctionAnimation((player, progress) => {
                 const t = progress * 1.5;
                 if (!player || !player.skin) return;
-
-                // Если активен шутер во время загрузки — держим оружие прямо перед собой в Top-Down стойке
-                if (document.body.classList.contains('is-shooter-active')) {
-                    const weaponId = equipmentManager.getSlot('mainHand');
-                    if (player.skin.head) {
-                        player.skin.head.rotation.set(0, 0, 0);
-                    }
-                    if (player.skin.rightArm) {
-                        if (weaponId === 'tacz_minigun') {
-                            player.skin.rightArm.rotation.set(-0.95, -0.15, 0.08);
-                        } else if (weaponId === 'tacz_rpg7') {
-                            player.skin.rightArm.rotation.set(-Math.PI / 2.05, -0.20, 0.08);
-                        } else {
-                            player.skin.rightArm.rotation.set(-Math.PI / 2, -0.22, 0.08);
-                        }
-                    }
-                    if (player.skin.leftArm) {
-                        if (weaponId === 'tacz_minigun') {
-                            player.skin.leftArm.rotation.set(-1.25, 0.65, -0.30);
-                        } else if (weaponId === 'tacz_rpg7') {
-                            player.skin.leftArm.rotation.set(-Math.PI / 2.05, 0.70, -0.30);
-                        } else {
-                            player.skin.leftArm.rotation.set(-Math.PI / 2.08, 0.75, -0.32);
-                        }
-                    }
-                    if (player.skin.rightLeg) player.skin.rightLeg.rotation.set(0, 0, 0);
-                    if (player.skin.leftLeg) player.skin.leftLeg.rotation.set(0, 0, 0);
-                    return;
-                }
 
                 // Плавная интерполяция к целевым углам курсора (lerp)
                 currentHeadX += (targetHeadX - currentHeadX) * 0.12;
@@ -281,9 +263,10 @@ async function render3dSkin(username) {
             }
         }
 
-        // Применяем рандомизированную экипировку персонажа
+        // Apply deterministic appearance for the selected build; armor remains empty.
         try {
-            equipmentManager.randomizeEquipment();
+            activeBuildId = window.__activeBuildProfileId || activeBuildId;
+            equipmentManager.applyBuildAppearance(activeBuildId);
             await equipmentManager.applyToViewer(skinViewer3d);
         } catch (e) {
             console.warn('[SkinViewer3D] Equipment apply error:', e);
@@ -402,7 +385,6 @@ function setupMouseTracking() {
 
     mouseMoveHandler = (e) => {
         if (currentMode !== '3d' || !skinViewer3d || !skinViewer3d.playerObject) return;
-        if (document.body.classList.contains('is-shooter-active')) return;
 
         const canvas = dom.get('skin-canvas-3d');
         if (!canvas) return;
@@ -425,100 +407,18 @@ function setupMouseTracking() {
     window.addEventListener('mousemove', mouseMoveHandler, { passive: true });
 }
 
-/**
- * Переключение камеры и положения персонажа между обычным видом и Top-Down шутером
- * @param {boolean} isShooter 
- */
-export function setTopDownShooterCamera(isShooter) {
-    if (!skinViewer3d) return;
-
-    if (isShooter) {
-        // Камера шутера сверху под углом (Top-Down Action Perspective)
-        if (skinViewer3d.controls) {
-            skinViewer3d.controls.minPolarAngle = 0;
-            skinViewer3d.controls.maxPolarAngle = Math.PI;
-            skinViewer3d.controls.enableRotate = false;
-        }
-        skinViewer3d.camera.position.set(0, 65, 46);
-        skinViewer3d.camera.lookAt(0, 0, 0);
-
-        if (skinViewer3d.playerObject) {
-            skinViewer3d.playerObject.position.set(0, -3.5, 0);
-            skinViewer3d.playerObject.rotation.set(0, 0, 0);
-            skinViewer3d.playerObject.scale.set(0.58, 0.58, 0.58);
-        }
-    } else {
-        // Возврат в стандартную камеру персонажа слева (повернут к центру)
-        if (skinViewer3d.controls) {
-            skinViewer3d.controls.minPolarAngle = Math.PI / 2 - 0.5;
-            skinViewer3d.controls.maxPolarAngle = Math.PI / 2 + 0.3;
-            skinViewer3d.controls.enableRotate = true;
-        }
-        skinViewer3d.camera.position.set(-2, 0, 78);
-        skinViewer3d.camera.lookAt(0, 0, 0);
-
-        if (skinViewer3d.playerObject) {
-            skinViewer3d.playerObject.position.set(-3.5, -1.0, 0);
-            skinViewer3d.playerObject.rotation.set(0, 0.38, 0);
-            skinViewer3d.playerObject.scale.set(1.0, 1.0, 1.0);
-        }
-    }
+export function randomizeCharacterEquipment() {
+    // Compatibility export for settings; dashboard appearance is profile-driven.
+    if (skinViewer3d && currentMode === '3d') refreshCharacterEquipment();
 }
 
-let lastRandomizeTime = 0;
-let isRandomizerHooked = false;
-
-/**
- * Рандомизация экипировки персонажа при возврате на главный экран или разворачивании окна
- * @param {boolean} force - пропустить проверку дебаунса
- */
-export function randomizeCharacterEquipment(force = false) {
-    const now = Date.now();
-    if (!force && (now - lastRandomizeTime < 1000)) return; // дебаунс 1 сек при авто-триггерах
-
-    if (!skinViewer3d || currentMode !== '3d') return;
-    if (document.body.classList.contains('is-shooter-active')) return;
-    if (document.querySelector('.wardrobe-modal.visible')) return;
-
-    lastRandomizeTime = now;
-    console.log('[SKIN-VIEWER] Randomizing character equipment set!');
-    equipmentManager.randomizeEquipment();
-    equipmentManager.applyToViewer(skinViewer3d);
+export function applyBuildCharacterAppearance(profileId) {
+    activeBuildId = profileId || '';
+    equipmentManager.applyBuildAppearance(activeBuildId);
+    refreshCharacterEquipment();
 }
 
-function triggerRandomizeOnRestore() {
-    randomizeCharacterEquipment(false);
-}
-
-/**
- * Подписка на события восстановления и фокуса окна
- */
-export function setupWindowRestoreRandomizer() {
-    if (isRandomizerHooked) return;
-    isRandomizerHooked = true;
-
-    // 1. При переключении вкладок/окон или разворачивании через DOM
-    document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'visible') {
-            triggerRandomizeOnRestore();
-        }
-    });
-
-    // 2. При получении фокуса окном
-    window.addEventListener('focus', () => {
-        triggerRandomizeOnRestore();
-    });
-
-    // 3. Через IPC события Electron при восстановлении из трея/сворачивания
-    if (window.api?.onWindowRestore) {
-        window.api.onWindowRestore(() => {
-            triggerRandomizeOnRestore();
-        });
-    }
-    if (window.api?.onWindowFocus) {
-        window.api.onWindowFocus(() => {
-            triggerRandomizeOnRestore();
-        });
-    }
+function setupProfileAppearanceListener() {
+    // The listener is registered during initSkinViewer, before the viewer is rendered.
 }
 

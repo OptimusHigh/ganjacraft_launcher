@@ -12,6 +12,41 @@ let cachedManifestProfileId = null;
 let searchQuery = '';
 let allGroupItems = [];
 
+function escapeHtml(value) {
+    return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
+function normalizeManifestPath(filePath) {
+    return String(filePath || '').replace(/\\/g, '/').replace(/^\/+/, '');
+}
+
+function getManifestFileKind(file) {
+    const normalizedPath = normalizeManifestPath(file?.path).toLowerCase();
+    const declaredKind = String(file?.kind || file?.type || '').trim().toLowerCase();
+
+    if (normalizedPath.startsWith('client_mods/')) return 'client_mod';
+    if (normalizedPath.startsWith('resourcepacks/')) return 'resourcepack';
+    if (normalizedPath.startsWith('shaderpacks/')) return 'shader';
+    if (declaredKind === 'client' || declaredKind === 'client_mod' || declaredKind === 'client-mod') return 'client_mod';
+    if (declaredKind === 'resource_pack' || declaredKind === 'resource-pack' || declaredKind === 'resourcepack') return 'resourcepack';
+    if (declaredKind === 'shaderpack' || declaredKind === 'shader_pack' || declaredKind === 'shader-pack' || declaredKind === 'shader') return 'shader';
+    return 'mod';
+}
+
+function isRegularModFile(file) {
+    const normalizedPath = normalizeManifestPath(file?.path).toLowerCase();
+    return normalizedPath.startsWith('mods/') && getManifestFileKind(file) === 'mod';
+}
+
+function getModFileName(filePath) {
+    return normalizeManifestPath(filePath).split('/').pop() || '';
+}
+
 function getModStem(filePath) {
     if (!filePath || typeof filePath !== 'string') return '';
     const fileName = filePath.split('/').pop().split('\\').pop().toLowerCase();
@@ -30,7 +65,7 @@ const LEGACY_GROUP_ALIASES = {
 
 function isModDisabled(filePath, disabledMods = []) {
     if (!filePath || !Array.isArray(disabledMods) || disabledMods.length === 0) return false;
-    const normPath = String(filePath).replace(/\\/g, '/');
+    const normPath = normalizeManifestPath(filePath);
     if (disabledMods.includes(normPath)) return true;
 
     const targetFileName = normPath.split('/').pop().toLowerCase();
@@ -38,7 +73,7 @@ function isModDisabled(filePath, disabledMods = []) {
 
     for (const disabledEntry of disabledMods) {
         if (!disabledEntry) continue;
-        const normDisabled = String(disabledEntry).replace(/\\/g, '/');
+        const normDisabled = normalizeManifestPath(disabledEntry);
         if (normDisabled === normPath) return true;
 
         const lookupId = LEGACY_GROUP_ALIASES[normDisabled] || normDisabled;
@@ -66,8 +101,18 @@ function isModDisabled(filePath, disabledMods = []) {
  * Загрузить список модов
  */
 export async function loadModsList(disabledMods = [], config = {}, forceReload = false) {
-    const profileId = config.activeProfileId || window.__activeBuildProfileId || 'vanilla';
+    const profileId = config.activeProfileId || window.__activeBuildProfileId || '';
     const profileChanged = cachedManifestProfileId !== profileId;
+    if (!profileId) {
+        cachedManifest = null;
+        cachedManifestProfileId = null;
+        allGroupItems = [];
+        const gridContainer = dom.get('mods-grid');
+        if (gridContainer) {
+            gridContainer.innerHTML = '<div class="unified-empty"><div class="unified-empty-icon">🎮</div><div class="unified-empty-text">Сначала выберите сборку</div></div>';
+        }
+        return;
+    }
     forceReload = forceReload || profileChanged;
     const gridContainer = dom.get('mods-grid');
     if (!gridContainer) return;
@@ -102,11 +147,21 @@ export async function loadModsList(disabledMods = [], config = {}, forceReload =
         return;
     }
 
-    const allFiles = cachedManifest.files.filter(f =>
-        f.optional &&
-        f.path.startsWith('mods/') &&
-        f.path.endsWith('.jar')
-    );
+    const manifestFiles = Array.isArray(cachedManifest.files) ? cachedManifest.files : [];
+    const allFiles = manifestFiles.filter(file => {
+        if (!file || !file.optional || typeof file.path !== 'string') return false;
+        const normalizedPath = normalizeManifestPath(file.path).toLowerCase();
+        return (
+            (normalizedPath.startsWith('mods/') || normalizedPath.startsWith('client_mods/')) &&
+            /\.(jar|zip)$/.test(normalizedPath)
+        ) || (
+                normalizedPath.startsWith('resourcepacks/') &&
+                /\.(zip|mcpack)$/.test(normalizedPath)
+            ) || (
+                normalizedPath.startsWith('shaderpacks/') &&
+                /\.(zip|jar)$/.test(normalizedPath)
+            );
+    });
 
     allGroupItems = [];
     const handledFiles = new Set();
@@ -114,7 +169,8 @@ export async function loadModsList(disabledMods = [], config = {}, forceReload =
     // Обрабатываем группы
     MOD_GROUPS.forEach(group => {
         const groupFiles = allFiles.filter(f => {
-            const fileName = f.path.split('/').pop().toLowerCase();
+            if (!isRegularModFile(f)) return false;
+            const fileName = getModFileName(f.path).toLowerCase();
             return group.files.some(pattern => fileName.includes(pattern.toLowerCase()));
         });
 
@@ -140,7 +196,7 @@ export async function loadModsList(disabledMods = [], config = {}, forceReload =
                 description: group.description,
                 curseSlug: group.curseSlug,
                 modrinthSlug: group.modrinthSlug,
-                paths: groupFiles.map(f => f.path),
+                paths: groupFiles.map(f => normalizeManifestPath(f.path)),
                 checked: isChecked
             });
         }
@@ -150,9 +206,18 @@ export async function loadModsList(disabledMods = [], config = {}, forceReload =
     const remainingFiles = allFiles.filter(f => !handledFiles.has(f.path));
     remainingFiles.forEach(file => {
         const isChecked = !isModDisabled(file.path, disabledMods);
-        const fileName = file.path.split('/').pop();
+        const fileName = getModFileName(file.path);
+        const normalizedPath = normalizeManifestPath(file.path).toLowerCase();
+        const kind = getManifestFileKind(file);
+        const specialSection = kind === 'resourcepack'
+            ? 'Ресурспаки'
+            : kind === 'shader'
+                ? 'Шейдеры'
+                : kind === 'client_mod'
+                    ? 'Клиентские моды'
+                    : null;
 
-        let prettyName = fileName
+        let prettyName = file.displayName || fileName
             .replace(/\.jar$/i, '')
             .replace(/^client[-_]/i, '')
             .replace(/[-_](neoforge|forge|fabric|mc|\d+\.\d+).*/i, '')
@@ -163,17 +228,19 @@ export async function loadModsList(disabledMods = [], config = {}, forceReload =
 
         allGroupItems.push({
             type: 'file',
-            id: slug,
+            id: `${kind}-${slug}`,
             name: prettyName,
             shortName: prettyName,
-            version: '1.0.0',
-            subCategory: 'Остальное',
+            version: file.version || '1.0.0',
+            kind,
+            badge: specialSection || 'Опциональный',
+            subCategory: specialSection || file.category || 'Остальное',
             icon: 'block',
             dependsOn: null,
-            description: `Дополнительный мод (${fileName})`,
+            description: `${specialSection || 'Дополнительный мод'} (${fileName})`,
             curseSlug: slug,
             modrinthSlug: slug,
-            paths: [file.path],
+            paths: [normalizeManifestPath(file.path)],
             checked: isChecked
         });
     });
@@ -343,7 +410,7 @@ export function renderModsGrid() {
         </div>
         <div class="category-content" style="padding: 12px 14px;">
             <div class="search-input-wrapper" style="width: 100%;">
-                <input type="text" id="mods-search-input" value="${searchQuery || ''}" placeholder="Поиск модов..." autocomplete="off">
+                <input type="text" id="mods-search-input" value="${escapeHtml(searchQuery || '')}" placeholder="Поиск модов..." autocomplete="off">
                 <button type="button" id="mods-search-clear-btn" class="search-action-btn" title="Очистить">
                     <svg class="search-icon-magnifier ${searchQuery ? 'hidden' : ''}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
                     <svg class="search-icon-clear ${searchQuery ? '' : 'hidden'}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
@@ -379,7 +446,7 @@ export function renderModsGrid() {
         emptyNotice.className = 'settings-category';
         emptyNotice.innerHTML = `
             <div class="category-content" style="padding: 24px; text-align: center; color: var(--gc-text-subtle, #7a808c); font-size: 13px;">
-                Опциональные моды по запросу «${query}» не найдены
+                Опциональные моды по запросу «${escapeHtml(query)}» не найдены
             </div>
         `;
         colLeft.appendChild(emptyNotice);
@@ -415,15 +482,15 @@ export function renderModsGrid() {
             itemLabel.dataset.id = mod.id;
 
             const iconSvg = getModItemSVG(mod.icon);
-            const paths = mod.paths.join('|');
+            const paths = escapeHtml(mod.paths.join('|'));
             const addonBadge = isAddon ? `<span class="addon-badge">Аддон</span>` : '';
 
             itemLabel.innerHTML = `
                 <div class="setting-label">
                     ${iconSvg}
                     <div class="setting-text">
-                        <span class="setting-title">${mod.shortName} <span style="font-size: 11px; color: #888; font-family: monospace;">v${mod.version}</span>${addonBadge}</span>
-                        <span class="setting-desc">${mod.description}</span>
+                        <span class="setting-title">${escapeHtml(mod.shortName)} <span style="font-size: 11px; color: #888; font-family: monospace;">v${escapeHtml(mod.version)}</span>${addonBadge}</span>
+                        <span class="setting-desc">${escapeHtml(mod.description)}</span>
                     </div>
                 </div>
                 <div class="setting-control">
@@ -459,7 +526,7 @@ export function renderModsGrid() {
                 addonsHeader.className = 'mod-addons-header';
                 addonsHeader.innerHTML = `
                     <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
-                    <span>АДДОНЫ И МОДУЛИ ДЛЯ ${mod.shortName.toUpperCase()}</span>
+                    <span>АДДОНЫ И МОДУЛИ ДЛЯ ${escapeHtml(mod.shortName).toUpperCase()}</span>
                 `;
                 addonsContainer.appendChild(addonsHeader);
 
@@ -623,17 +690,17 @@ function appendCatalogBatch(contentContainer) {
     for (let i = currentRenderedIndex; i < nextIndex; i++) {
         const item = filteredCatalogItems[i];
         const row = document.createElement('div');
-        row.className = 'setting-item';
+        row.className = 'setting-item manifest-catalog-row';
         row.innerHTML = `
             <div class="setting-label">
                 <svg class="setting-icon"><use href="#icon-game"/></svg>
                 <div class="setting-text">
-                    <span class="setting-title">${item.cleanName} <span style="font-size: 11px; color: ${item.isOptional ? '#81c784' : '#64b5f6'};">(${item.isOptional ? 'Опциональный' : 'Базовый'})</span></span>
-                    <span class="setting-desc" style="font-family: monospace;">${item.fileName}</span>
+                    <span class="setting-title">${escapeHtml(item.cleanName)} <span style="font-size: 11px; color: ${item.isOptional ? '#81c784' : '#64b5f6'};">(${item.isOptional ? 'Опциональный' : 'Базовый'})</span></span>
+                    <span class="setting-desc" style="font-family: monospace;">${escapeHtml(item.fileName)}</span>
                 </div>
             </div>
             <div class="setting-control">
-                <button type="button" class="unified-btn unified-btn-primary" data-url="${item.modrinthUrl}" ${item.hash ? `data-hash="${item.hash}"` : ''}>⚡ Modrinth ↗</button>
+                <button type="button" class="unified-btn unified-btn-primary" data-url="${escapeHtml(item.modrinthUrl)}" ${item.hash ? `data-hash="${escapeHtml(item.hash)}"` : ''}>⚡ Modrinth ↗</button>
             </div>
         `;
         fragment.appendChild(row);
@@ -654,10 +721,20 @@ function renderLinksCatalogIntoContainer(manifest, contentContainer, query = '')
 
     if (!cachedCatalogData || lastCatalogManifest !== manifest) {
         lastCatalogManifest = manifest;
-        const jarFiles = manifest.files.filter(f => f.path.startsWith('mods/') && f.path.endsWith('.jar'));
+        const jarFiles = (Array.isArray(manifest.files) ? manifest.files : []).filter(f => {
+            const filePath = normalizeManifestPath(f?.path).toLowerCase();
+            return (
+                (filePath.startsWith('mods/') || filePath.startsWith('client_mods/')) && /\.(jar|zip)$/.test(filePath)
+            ) || (
+                    filePath.startsWith('resourcepacks/') && /\.(zip|mcpack)$/.test(filePath)
+                ) || (
+                    filePath.startsWith('shaderpacks/') && /\.(zip|jar)$/.test(filePath)
+                );
+        });
 
         cachedCatalogData = jarFiles.map(file => {
-            const fileName = file.path.split('/').pop();
+            const fileName = getModFileName(file.path);
+            const fileKind = getManifestFileKind(file);
             let cleanName = fileName
                 .replace(/\.jar$/i, '')
                 .replace(/^client[-_]/i, '')
@@ -665,11 +742,13 @@ function renderLinksCatalogIntoContainer(manifest, contentContainer, query = '')
                 .replace(/[-_]\d+.*$/i, '');
             cleanName = cleanName.charAt(0).toUpperCase() + cleanName.slice(1);
 
-            const groupMatch = MOD_GROUPS.find(g =>
-                g.files && g.files.some(p => fileName.toLowerCase().includes(p.toLowerCase()))
-            );
+            const groupMatch = fileKind === 'mod' && normalizeManifestPath(file.path).toLowerCase().startsWith('mods/')
+                ? MOD_GROUPS.find(g =>
+                    g.files && g.files.some(p => fileName.toLowerCase().includes(p.toLowerCase()))
+                )
+                : null;
 
-            const downloadUrl = file.url || `${FILES_BASE}/${file.path.replace(/^\/+/, '')}`;
+            const downloadUrl = file.url || `${FILES_BASE}/${normalizeManifestPath(file.path)}`;
 
             const modrinthUrl = groupMatch?.modrinthSlug
                 ? `https://modrinth.com/mod/${groupMatch.modrinthSlug}`
@@ -678,6 +757,7 @@ function renderLinksCatalogIntoContainer(manifest, contentContainer, query = '')
             return {
                 fileName,
                 cleanName: groupMatch ? groupMatch.name : cleanName,
+                kind: fileKind,
                 isOptional: !!file.optional,
                 downloadUrl,
                 modrinthUrl: (file.hash && resolvedModrinthUrls[file.hash.toLowerCase()])
@@ -707,7 +787,7 @@ function renderLinksCatalogIntoContainer(manifest, contentContainer, query = '')
     });
 
     if (filteredCatalogItems.length === 0) {
-        contentContainer.innerHTML = '<div class="unified-empty"><div class="unified-empty-text">Моды не найдены</div></div>';
+        contentContainer.innerHTML = `<div class="unified-empty"><div class="unified-empty-text">${query ? `По запросу «${escapeHtml(query)}» файлы не найдены` : 'В манифесте нет дополнительных файлов'}</div></div>`;
         return;
     }
 

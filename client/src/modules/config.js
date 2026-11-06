@@ -10,17 +10,15 @@ const CONFIG_FILE = path.join(app.getPath('userData'), 'launcher_config.json');
 const LEGACY_CONFIG_FILE = path.join(app.getPath('appData'), '.ganjacraft', 'launcher_config.json');
 
 function getDefaultConfig() {
-    let defaultInstallPath;
+    let defaultInstallRoot;
     if (process.platform === 'win32' && app.isPackaged) {
         const exeDir = path.dirname(app.getPath('exe'));
-        // If installed in Program Files, it requires admin rights, so fallback to AppData
-        if (exeDir.toLowerCase().includes('program files')) {
-            defaultInstallPath = path.join(app.getPath('appData'), '.ganjacraft');
-        } else {
-            defaultInstallPath = path.join(exeDir, 'game');
-        }
+        // Keep game data outside Program Files, where writes may be restricted.
+        defaultInstallRoot = exeDir.toLowerCase().includes('program files')
+            ? path.join(app.getPath('appData'), '.ganjacraft')
+            : path.join(exeDir, 'game');
     } else {
-        defaultInstallPath = path.join(app.getPath('appData'), '.ganjacraft');
+        defaultInstallRoot = path.join(app.getPath('appData'), '.ganjacraft');
     }
 
     return {
@@ -31,17 +29,18 @@ function getDefaultConfig() {
         modsDefaultsApplied: false,
         modsDefaultsVersion: 2,
 
-        // General
-        // Keep installPath as the legacy alias for the vanilla profile.
-        installPath: defaultInstallPath,
+        // General: one user-selected root, with isolated profile directories below it.
+        installRoot: defaultInstallRoot,
+        // Legacy alias is kept as the Vanilla profile path for older integrations.
+        installPath: path.join(defaultInstallRoot, 'vanilla'),
         activeProfileId: 'vanilla',
         profiles: {
             vanilla: {
-                installPath: defaultInstallPath,
+                installPath: path.join(defaultInstallRoot, 'vanilla'),
                 disabledMods: [],
             },
             ganj4craft5: {
-                installPath: path.join(defaultInstallPath, 'ganj4craft5'),
+                installPath: path.join(defaultInstallRoot, 'ganj4craft5'),
                 disabledMods: [],
             },
         },
@@ -82,15 +81,21 @@ function normalizeLoadedConfig(config) {
         merged.disabledMods = [];
     }
 
-    // Migrate the old single-install config without moving the existing vanilla files.
+    // Normalize the new layout: one root and one directory per profile.
     if (!merged.profiles || typeof merged.profiles !== 'object') merged.profiles = {};
     if (!merged.profiles.vanilla || typeof merged.profiles.vanilla !== 'object') merged.profiles.vanilla = {};
     if (!merged.profiles.ganj4craft5 || typeof merged.profiles.ganj4craft5 !== 'object') merged.profiles.ganj4craft5 = {};
-    merged.profiles.vanilla.installPath = merged.profiles.vanilla.installPath || merged.installPath;
+
+    const hasInstallRoot = typeof merged.installRoot === 'string' && merged.installRoot.trim();
+    const legacyInstallPath = typeof merged.installPath === 'string' ? merged.installPath.trim() : '';
+    const configuredRoot = hasInstallRoot
+        ? merged.installRoot.trim()
+        : (legacyInstallPath || defaults.installRoot);
+    merged.installRoot = path.normalize(configuredRoot);
+    merged.profiles.vanilla.installPath = path.join(merged.installRoot, 'vanilla');
+    merged.profiles.ganj4craft5.installPath = path.join(merged.installRoot, 'ganj4craft5');
     merged.profiles.vanilla.disabledMods = Array.isArray(merged.profiles.vanilla.disabledMods)
         ? merged.profiles.vanilla.disabledMods : merged.disabledMods;
-    merged.profiles.ganj4craft5.installPath = merged.profiles.ganj4craft5.installPath
-        || path.join(merged.profiles.vanilla.installPath, 'ganj4craft5');
     if (!Array.isArray(merged.profiles.ganj4craft5.disabledMods)) merged.profiles.ganj4craft5.disabledMods = [];
     merged.activeProfileId = merged.activeProfileId === 'ganj4craft5' ? 'ganj4craft5' : 'vanilla';
     merged.installPath = merged.profiles.vanilla.installPath;
@@ -152,6 +157,9 @@ function loadConfig() {
 function saveConfig(config) {
     try {
         const normalized = normalizeLoadedConfig(config);
+        if (!normalized.installRoot || normalized.installRoot === path.parse(normalized.installRoot).root) {
+            throw new Error('Install root must be a non-root directory');
+        }
         const dir = path.dirname(CONFIG_FILE);
         if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 

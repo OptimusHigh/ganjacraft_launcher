@@ -9,6 +9,7 @@
 import * as THREE from 'three';
 import { taczGeoLoader } from './tacz-geo-loader.js';
 import { armorMeshBuilder } from './armor-mesh-builder.js';
+import { voxelItemBuilder } from './voxel-item-builder.js';
 
 const STORAGE_KEY_EQUIPMENT = 'ganjacraft_player_equipment_v1';
 
@@ -17,90 +18,93 @@ export const EQUIPMENT_CATALOG = {
     // 🪖 ШЛЕМЫ / ГОЛОВА
     head: {
         none: { id: 'none', name: 'Без шлема', icon: '👤', rarity: 'common' },
-        netherite_helmet: { 
-            id: 'netherite_helmet', 
-            name: 'Незеритовый шлем', 
-            icon: 'assets/equipment/items/netherite_helmet.png', 
-            isImage: true, 
-            rarity: 'epic', 
-            armorTex: 'assets/equipment/armor/netherite_layer_1.png' 
+        netherite_helmet: {
+            id: 'netherite_helmet',
+            name: 'Незеритовый шлем',
+            icon: 'assets/equipment/items/netherite_helmet.png',
+            isImage: true,
+            rarity: 'epic',
+            armorTex: 'assets/equipment/armor/netherite_layer_1.png'
         },
-        diamond_helmet: { 
-            id: 'diamond_helmet', 
-            name: 'Алмазный шлем', 
-            icon: 'assets/equipment/items/diamond_helmet.png', 
-            isImage: true, 
-            rarity: 'rare', 
-            armorTex: 'assets/equipment/armor/diamond_layer_1.png' 
+        diamond_helmet: {
+            id: 'diamond_helmet',
+            name: 'Алмазный шлем',
+            icon: 'assets/equipment/items/diamond_helmet.png',
+            isImage: true,
+            rarity: 'rare',
+            armorTex: 'assets/equipment/armor/diamond_layer_1.png'
         }
     },
 
     // 🎽 НАГРУДНИК / ТЕЛО
     chest: {
         none: { id: 'none', name: 'Без брони', icon: '👕', rarity: 'common' },
-        netherite_chestplate: { 
-            id: 'netherite_chestplate', 
-            name: 'Незеритовый нагрудник', 
-            icon: 'assets/equipment/items/netherite_chestplate.png', 
-            isImage: true, 
-            rarity: 'epic', 
-            armorTex: 'assets/equipment/armor/netherite_layer_1.png' 
+        netherite_chestplate: {
+            id: 'netherite_chestplate',
+            name: 'Незеритовый нагрудник',
+            icon: 'assets/equipment/items/netherite_chestplate.png',
+            isImage: true,
+            rarity: 'epic',
+            armorTex: 'assets/equipment/armor/netherite_layer_1.png'
         },
-        diamond_chestplate: { 
-            id: 'diamond_chestplate', 
-            name: 'Алмазный нагрудник', 
-            icon: 'assets/equipment/items/diamond_chestplate.png', 
-            isImage: true, 
-            rarity: 'rare', 
-            armorTex: 'assets/equipment/armor/diamond_layer_1.png' 
+        diamond_chestplate: {
+            id: 'diamond_chestplate',
+            name: 'Алмазный нагрудник',
+            icon: 'assets/equipment/items/diamond_chestplate.png',
+            isImage: true,
+            rarity: 'rare',
+            armorTex: 'assets/equipment/armor/diamond_layer_1.png'
         }
     },
 
     // 👖 ПОНОЖИ / НОГИ
     legs: {
         none: { id: 'none', name: 'Без поножей', icon: '🩳', rarity: 'common' },
-        netherite_leggings: { 
-            id: 'netherite_leggings', 
-            name: 'Незеритовые поножи', 
-            icon: 'assets/equipment/items/netherite_leggings.png', 
-            isImage: true, 
-            rarity: 'epic', 
-            armorLegsTex: 'assets/equipment/armor/netherite_layer_2.png' 
+        netherite_leggings: {
+            id: 'netherite_leggings',
+            name: 'Незеритовые поножи',
+            icon: 'assets/equipment/items/netherite_leggings.png',
+            isImage: true,
+            rarity: 'epic',
+            armorLegsTex: 'assets/equipment/armor/netherite_layer_2.png'
         },
-        diamond_leggings: { 
-            id: 'diamond_leggings', 
-            name: 'Алмазные поножи', 
-            icon: 'assets/equipment/items/diamond_leggings.png', 
-            isImage: true, 
-            rarity: 'rare', 
-            armorLegsTex: 'assets/equipment/armor/diamond_layer_2.png' 
+        diamond_leggings: {
+            id: 'diamond_leggings',
+            name: 'Алмазные поножи',
+            icon: 'assets/equipment/items/diamond_leggings.png',
+            isImage: true,
+            rarity: 'rare',
+            armorLegsTex: 'assets/equipment/armor/diamond_layer_2.png'
         }
     },
 
     // 👢 БОТИНКИ / СТУПНИ
     boots: {
         none: { id: 'none', name: 'Без ботинок', icon: '🧦', rarity: 'common' },
-        netherite_boots: { 
-            id: 'netherite_boots', 
-            name: 'Незеритовые ботинки', 
-            icon: 'assets/equipment/items/netherite_boots.png', 
-            isImage: true, 
-            rarity: 'epic', 
-            armorTex: 'assets/equipment/armor/netherite_layer_1.png' 
+        netherite_boots: {
+            id: 'netherite_boots',
+            name: 'Незеритовые ботинки',
+            icon: 'assets/equipment/items/netherite_boots.png',
+            isImage: true,
+            rarity: 'epic',
+            armorTex: 'assets/equipment/armor/netherite_layer_1.png'
         },
-        diamond_boots: { 
-            id: 'diamond_boots', 
-            name: 'Алмазные ботинки', 
-            icon: 'assets/equipment/items/diamond_boots.png', 
-            isImage: true, 
-            rarity: 'rare', 
-            armorTex: 'assets/equipment/armor/diamond_layer_1.png' 
+        diamond_boots: {
+            id: 'diamond_boots',
+            name: 'Алмазные ботинки',
+            icon: 'assets/equipment/items/diamond_boots.png',
+            isImage: true,
+            rarity: 'rare',
+            armorTex: 'assets/equipment/armor/diamond_layer_1.png'
         }
     },
 
-    // ⚔️ ОСНОВНАЯ РУКА (TACZ 3D арсенал)
+    // ⚔️ ОСНОВНАЯ РУКА (предметы сборки и TACZ 3D арсенал)
     mainHand: {
         none: { id: 'none', name: 'Пустая рука', icon: '✊', rarity: 'common' },
+        vanilla_diamond_sword: { id: 'vanilla_diamond_sword', name: 'Алмазный меч', icon: 'assets/equipment/items/diamond_sword.png', isImage: true, rarity: 'rare', type: 'voxel_item', itemTex: 'assets/equipment/items/diamond_sword.png' },
+        vanilla_diamond_pickaxe: { id: 'vanilla_diamond_pickaxe', name: 'Алмазная кирка', icon: 'assets/equipment/items/diamond_pickaxe.png', isImage: true, rarity: 'rare', type: 'voxel_item', itemTex: 'assets/equipment/items/diamond_pickaxe.png' },
+        ganj4craft5_wand: { id: 'ganj4craft5_wand', name: 'Тауматургическая палочка', icon: 'assets/equipment/items/tf_twilight_scepter.png', isImage: true, rarity: 'mythic', type: 'voxel_item', itemTex: 'assets/equipment/items/tf_twilight_scepter.png' },
         tacz_deagle: { id: 'tacz_deagle', name: 'Desert Eagle .50', mod: 'TACZ', icon: 'assets/tacz/hud/deagle.png', isImage: true, rarity: 'epic', type: 'tacz_geo', geoGunId: 'deagle' },
         tacz_spas_12: { id: 'tacz_spas_12', name: 'SPAS-12', mod: 'TACZ', icon: 'assets/tacz/hud/spas_12.png', isImage: true, rarity: 'rare', type: 'tacz_geo', geoGunId: 'spas_12' },
         tacz_ak47: { id: 'tacz_ak47', name: 'АК-47', mod: 'TACZ', icon: 'assets/tacz/hud/ak47.png', isImage: true, rarity: 'epic', type: 'tacz_geo', geoGunId: 'ak47' },
@@ -288,6 +292,21 @@ class EquipmentManager {
         }
     }
 
+    applyBuildAppearance(profileId) {
+        const buildId = String(profileId || '').toLowerCase();
+        this.currentEquipment = {
+            head: 'none',
+            chest: 'none',
+            legs: 'none',
+            boots: 'none',
+            mainHand: buildId === 'ganj4craft5' ? 'ganj4craft5_wand' : 'vanilla_diamond_sword',
+            offHand: 'none',
+            back: 'none',
+        };
+        this.saveEquipment();
+        this.notifyListeners();
+    }
+
     applyPreset(presetId) {
         if (presetId === 'random') {
             this.randomizeEquipment();
@@ -306,13 +325,13 @@ class EquipmentManager {
      */
     randomizeEquipment() {
         const taczGuns = [
-            'tacz_ak47', 
-            'tacz_vector45', 
-            'tacz_awp', 
-            'tacz_spas_12', 
-            'tacz_deagle', 
-            'tacz_glock17', 
-            'tacz_rpg7', 
+            'tacz_ak47',
+            'tacz_vector45',
+            'tacz_awp',
+            'tacz_spas_12',
+            'tacz_deagle',
+            'tacz_glock17',
+            'tacz_rpg7',
             'tacz_minigun'
         ];
 
@@ -449,7 +468,7 @@ class EquipmentManager {
         const disposeMesh = (obj) => {
             if (!obj) return;
             if (obj.geometry) {
-                try { obj.geometry.dispose(); } catch (_) {}
+                try { obj.geometry.dispose(); } catch (_) { }
             }
             if (obj.material) {
                 try {
@@ -458,7 +477,7 @@ class EquipmentManager {
                     } else {
                         obj.material.dispose();
                     }
-                } catch (_) {}
+                } catch (_) { }
             }
             if (obj.children && obj.children.length > 0) {
                 for (let c = obj.children.length - 1; c >= 0; c--) {
@@ -474,9 +493,9 @@ class EquipmentManager {
                 for (let i = part.children.length - 1; i >= 0; i--) {
                     const child = part.children[i];
                     if (child && child.name && (
-                        child.name.startsWith('EQ_') || 
-                        child.name.startsWith('ARMOR_') || 
-                        child.name.startsWith('TACZ_') || 
+                        child.name.startsWith('EQ_') ||
+                        child.name.startsWith('ARMOR_') ||
+                        child.name.startsWith('TACZ_') ||
                         child.name.startsWith('VOXEL_')
                     )) {
                         part.remove(child);
@@ -504,6 +523,9 @@ class EquipmentManager {
     async buildWeaponMesh(item) {
         if (item.type === 'tacz_geo' && item.geoGunId) {
             return await taczGeoLoader.loadGunModel(item.geoGunId);
+        }
+        if (item.type === 'voxel_item' && item.itemTex) {
+            return await voxelItemBuilder.createItemMesh(item.itemTex, { depth: 0.7, scale: 0.7 });
         }
         return null;
     }

@@ -15,7 +15,6 @@ import { initRamSlider } from './ram-slider.js';
 import { debounce, triggerInertiaCascade } from '../../utils/performance.js';
 import { renderChangelogList, markChangelogSeen, checkChangelogBadge } from '../changelog/changelog-manager.js';
 import { applySkinMode, getSkinViewerMode, randomizeCharacterEquipment } from '../skin-viewer/index.js';
-import { gunShooter } from '../easter-eggs/index.js';
 
 // Стейт для отслеживания изменений
 let initialSettingsState = null;
@@ -51,7 +50,6 @@ export function getCurrentSettingsState() {
         effectsDensity: document.getElementById('setting-effects-density')?.value || 'low',
         enableSmoke: document.getElementById('setting-enable-smoke')?.checked ?? true,
         enableParallax: document.getElementById('setting-enable-parallax')?.checked ?? true,
-        enableMinigame: document.getElementById('setting-enable-minigame')?.checked ?? true,
         enableDiscordRpc: document.getElementById('setting-enable-discord-rpc')?.checked ?? true,
         disabledMods: getDisabledMods().sort().join(',')
     };
@@ -125,7 +123,6 @@ export function setupSettingsChangeListeners() {
         'setting-effects-density',
         'setting-enable-smoke',
         'setting-enable-parallax',
-        'setting-enable-minigame',
         'setting-enable-discord-rpc'
     ];
 
@@ -444,7 +441,7 @@ export function populateSettingsFields(config) {
 
     const activeProfileId = window.__activeBuildProfileId || currentConfig.activeProfileId || 'vanilla';
     const activeProfile = currentConfig.profiles?.[activeProfileId];
-    const activeInstallPath = activeProfile?.installPath || currentConfig.installPath || '';
+    const activeInstallPath = currentConfig.installRoot || activeProfile?.installPath || currentConfig.installPath || '';
 
     const pathInput = document.getElementById('setting-path');
     const javaInput = document.getElementById('setting-java');
@@ -456,7 +453,6 @@ export function populateSettingsFields(config) {
     const densitySelect = document.getElementById('setting-effects-density');
     const smokeCheckbox = document.getElementById('setting-enable-smoke');
     const parallaxCheckbox = document.getElementById('setting-enable-parallax');
-    const minigameCheckbox = document.getElementById('setting-enable-minigame');
     const discordRpcCheckbox = document.getElementById('setting-enable-discord-rpc');
 
     if (pathInput) pathInput.value = activeInstallPath;
@@ -477,7 +473,6 @@ export function populateSettingsFields(config) {
 
     if (smokeCheckbox) smokeCheckbox.checked = config.enableSmoke !== false;
     if (parallaxCheckbox) parallaxCheckbox.checked = config.enableParallax !== false;
-    if (minigameCheckbox) minigameCheckbox.checked = config.enableMinigame !== false && gunShooter.getIsEnabled();
     if (discordRpcCheckbox) discordRpcCheckbox.checked = config.enableDiscordRpc !== false;
 
     // Инициализация RAM slider (новый UI)
@@ -501,16 +496,23 @@ export async function saveSettings() {
 
     const selectedPreset = document.getElementById('setting-effects-preset')?.value || 'auto';
     const selectedSkinMode = document.getElementById('setting-skin-mode')?.value || '3d';
-    const selectedMinigame = document.getElementById('setting-enable-minigame')?.checked ?? true;
     const selectedDiscordRpc = document.getElementById('setting-enable-discord-rpc')?.checked ?? true;
 
     const activeProfileId = window.__activeBuildProfileId || currentConfig.activeProfileId || 'vanilla';
-    const selectedInstallPath = document.getElementById('setting-path')?.value || '';
+    const selectedInstallRoot = document.getElementById('setting-path')?.value || '';
+    const rootPath = selectedInstallRoot.replace(/[\\/]+$/, '');
     const profiles = {
         ...(currentConfig.profiles || {}),
+        vanilla: {
+            ...(currentConfig.profiles?.vanilla || {}),
+            installPath: `${rootPath}/vanilla`,
+        },
+        ganj4craft5: {
+            ...(currentConfig.profiles?.ganj4craft5 || {}),
+            installPath: `${rootPath}/ganj4craft5`,
+        },
         [activeProfileId]: {
             ...(currentConfig.profiles?.[activeProfileId] || {}),
-            installPath: selectedInstallPath,
             disabledMods: getDisabledMods(),
         },
     };
@@ -518,10 +520,9 @@ export async function saveSettings() {
     const newConfig = {
         ...currentConfig,
         activeProfileId,
-        // Legacy alias remains the Vanilla path for older launcher code.
-        installPath: activeProfileId === 'vanilla'
-            ? selectedInstallPath
-            : (profiles.vanilla?.installPath || currentConfig.installPath || ''),
+        installRoot: selectedInstallRoot,
+        // Legacy alias remains the Vanilla profile path for older launcher code.
+        installPath: profiles.vanilla.installPath,
         profiles,
         javaPath: document.getElementById('setting-java')?.value || '',
         memoryMin: memMin,
@@ -533,7 +534,6 @@ export async function saveSettings() {
         enableSnow: selectedPreset !== 'off',
         enableSmoke: document.getElementById('setting-enable-smoke')?.checked ?? true,
         enableParallax: document.getElementById('setting-enable-parallax')?.checked ?? true,
-        enableMinigame: selectedMinigame,
         enableDiscordRpc: selectedDiscordRpc,
         disabledMods: getDisabledMods(),
         modsDefaultsApplied: true,
@@ -547,9 +547,6 @@ export async function saveSettings() {
     }
 
     currentConfig = newConfig;
-
-    // Apply Minigame state
-    gunShooter.setIsEnabled(selectedMinigame);
 
     // Apply Skin Mode (3D / 2D / off)
     applySkinMode(selectedSkinMode);

@@ -38,8 +38,15 @@
 }
 
 @keyframes slideUpProgress {
-    from { opacity: 0; transform: translateY(20px); }
-    to { opacity: 1; transform: translateY(0); }
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 .launch-progress-top-row {
@@ -363,40 +370,14 @@
 body.log-modal-open .player-character-section,
 body.log-modal-open #skin-viewer-container,
 body.log-modal-open #step-progress,
-body.log-modal-open .shooter-hotbar-container,
-body.log-modal-open .shooter-top-controls,
 body.log-modal-open .player-defense-container,
 body.log-modal-open .player-defense-hud,
 body.log-modal-open .boss-health-container,
 body.log-modal-open .active-buffs-bar,
-body.log-modal-open .gun-shooter-canvas,
-body.log-modal-open .gun-crosshair,
-body.log-modal-open .gun-shooter-crosshair,
-body.log-modal-open #gun-shooter-crosshair,
 body.log-modal-open .launch-kills-badge {
     opacity: 0 !important;
     visibility: hidden !important;
     pointer-events: none !important;
-}
-
-/* ── Reposition Progress HUD to top-left when mini-game is active so it never overlaps the hotbar ── */
-body.is-shooter-active #step-progress {
-    bottom: auto !important;
-    top: 48px !important;
-    left: 20px !important;
-    transform: none !important;
-    min-width: 250px !important;
-    max-width: 290px !important;
-    z-index: 95 !important;
-}
-
-body.is-shooter-active .launch-progress-layout {
-    padding: 6px 14px 8px 14px !important;
-    border-radius: 12px !important;
-}
-
-body.is-shooter-active .launch-kills-badge {
-    display: none !important;
 }
 
 .launch-console-body {

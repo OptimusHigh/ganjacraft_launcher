@@ -5,9 +5,9 @@
 
 import { dom } from '../../utils/dom.js';
 import { logToConsole } from '../console/index.js';
+import { showNotification } from '../../ui/modals.js';
 import { getCurrentUsername, getAuthToken } from '../auth/index.js';
 import { getCurrentConfig, settingsChanged, saveSettings, closeSettings } from '../settings/index.js';
-import { gunShooter } from '../easter-eggs/index.js';
 import { isLauncherUpdateAvailable, handleLauncherUpdateClick, renderLauncherUpdateButton } from '../updater/index.js';
 
 /**
@@ -26,13 +26,11 @@ export function toggleLaunchLogModal() {
     if (modal.classList.contains('hidden')) {
         modal.classList.remove('hidden');
         document.body.classList.add('log-modal-open');
-        gunShooter.setLogModalOpen(true); // Скрываем и очищаем летающие мишени и прицел
         const output = dom.get('console-output');
         if (output) output.scrollTop = output.scrollHeight;
     } else {
         modal.classList.add('hidden');
         document.body.classList.remove('log-modal-open');
-        gunShooter.setLogModalOpen(false); // Возобновляем тир при закрытии консоли
     }
 }
 
@@ -199,7 +197,6 @@ function showPlayScreen() {
         stepPlay.classList.add('fade-in');
     }
     unlockControlsAfterLaunch();
-    gunShooter.setGameLaunchingMode(false);
 }
 
 /**
@@ -207,12 +204,24 @@ function showPlayScreen() {
  */
 export async function startLaunch() {
     console.log('[GAME] startLaunch() called');
+    if (!window.__activeBuildProfileId) {
+        const selector = document.getElementById('build-profile-selector');
+        if (selector) {
+            selector.focus();
+            selector.setAttribute('aria-invalid', 'true');
+            setTimeout(() => selector.removeAttribute('aria-invalid'), 1800);
+        }
+        const message = 'Сначала выберите сборку в списке рядом с кнопкой «Играть».';
+        logToConsole(`[LAUNCHER] ${message}`);
+        showNotification(message, 'warning', 'Сборка не выбрана', 4000);
+        showPlayScreen();
+        return false;
+    }
     if (isLauncherUpdateAvailable()) {
         handleLauncherUpdateClick();
         return;
     }
     lockControlsForLaunch();
-    gunShooter.setGameLaunchingMode(true);
 
     const statusDiv = dom.get('game-status') || dom.get('status');
     const consoleOutput = dom.get('console-output');
@@ -241,11 +250,27 @@ export async function startLaunch() {
     logToConsole('[LAUNCHER] Подготовка к запуску игры...');
     console.log('[GAME] Calling window.api.launchGame...');
 
-    const result = await window.api.launchGame({
-        username: getCurrentUsername(),
-        token: getAuthToken(),
-        profileId: window.__activeBuildProfileId || undefined,
-    });
+    let result;
+    try {
+        result = await window.api.launchGame({
+            username: getCurrentUsername(),
+            token: getAuthToken(),
+            profileId: window.__activeBuildProfileId || undefined,
+        });
+    } catch (error) {
+        console.error('[GAME] launchGame IPC failed:', error);
+        const message = error?.message || 'Не удалось связаться с процессом запуска.';
+        if (statusDiv) {
+            statusDiv.innerText = `Ошибка: ${message.substring(0, 40)}${message.length > 40 ? '...' : ''}`;
+            statusDiv.style.color = '#ef5350';
+        }
+        logToConsole(`[ERROR] ${message}`);
+        if (retryBtn) retryBtn.classList.remove('hidden');
+        if (cancelBtn) cancelBtn.classList.add('hidden');
+        showPlayScreen();
+        setJointProgress(gameJointProgress, gameJointBurn, gameJointEnd, 0);
+        return false;
+    }
     console.log('[GAME] window.api.launchGame returned:', result);
 
     if (result.success) {
@@ -406,9 +431,6 @@ export function initProgressHandlers() {
                 statusEl.style.color = '#39ff14';
             }
 
-            // Завершаем режим тира
-            gunShooter.setGameLaunchingMode(false);
-
             // Сворачиваем лаунчер только теперь, когда игра действительно полностью готова
             const cfg = getCurrentConfig() || {};
             if (cfg.hideOnPlay !== false) {
@@ -436,7 +458,8 @@ export function initProgressHandlers() {
 
         const playBtn = dom.get('play-btn');
         if (playBtn) {
-            playBtn.disabled = false;
+            playBtn.disabled = !window.__activeBuildProfileId
+                && !playBtn.classList.contains('is-update-btn');
         }
 
         unlockControlsAfterLaunch();
@@ -459,6 +482,8 @@ export function initGameButtons() {
                 cancelLaunch();
             } else if (isLauncherUpdateAvailable()) {
                 handleLauncherUpdateClick();
+            } else if (!window.__activeBuildProfileId) {
+                startLaunch();
             } else {
                 if (stepProgress) {
                     stepProgress.classList.remove('hidden');

@@ -427,7 +427,10 @@ const CURRENT_MODS_DEFAULTS_VERSION = 2;
  */
 async function applyDefaultModSettings(config, rootPath, sendLog, sendDebug, options = {}) {
     const profile = options.profile || getBuildProfile(config.activeProfileId);
-    if (config.modsDefaultsApplied === true && config.modsDefaultsVersion === CURRENT_MODS_DEFAULTS_VERSION) return config;
+    const profileConfig = getProfileConfig(config, profile.id);
+    const defaultsAlreadyApplied = profileConfig.modsDefaultsApplied === true
+        && profileConfig.modsDefaultsVersion === CURRENT_MODS_DEFAULTS_VERSION;
+    if (defaultsAlreadyApplied) return config;
     const signal = options.signal;
     if (signal && signal.aborted) throw new Error('CANCELLED');
 
@@ -440,7 +443,6 @@ async function applyDefaultModSettings(config, rootPath, sendLog, sendDebug, opt
         const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
         const defaults = computeDefaultDisabledModsFromManifest(manifest);
 
-        const profileConfig = getProfileConfig(config, profile.id);
         const existing = Array.isArray(profileConfig.disabledMods) ? profileConfig.disabledMods : [];
         const merged = Array.from(new Set([...existing, ...defaults]));
         config.profiles[profile.id].disabledMods = merged;
@@ -870,6 +872,12 @@ function handleLaunchError(error, rootPath, profile) {
  * Запустить игру
  */
 async function launchGame(event, options) {
+    const requestedProfileId = options && typeof options.profileId === 'string'
+        ? options.profileId.trim()
+        : '';
+    if (requestedProfileId !== 'vanilla' && requestedProfileId !== 'ganj4craft5') {
+        return { success: false, error: 'Сначала выберите сборку в лаунчере.' };
+    }
     if (isGameRunning) {
         return { success: false, error: "Игра уже запущена!" };
     }
@@ -882,11 +890,14 @@ async function launchGame(event, options) {
     const signal = launchAbortController.signal;
 
     let config = loadConfig();
-    const requestedProfileId = options && options.profileId;
-    const profile = getBuildProfile(requestedProfileId || config.activeProfileId);
+    const profile = getBuildProfile(requestedProfileId);
     const profileConfig = getProfileConfig(config, profile.id);
     config.activeProfileId = profile.id;
     const rootPath = profileConfig.installPath;
+    if (!rootPath || rootPath === path.parse(rootPath).root) {
+        isGameRunning = false;
+        return { success: false, error: 'Не задана корректная папка установки выбранной сборки.' };
+    }
 
     if (!fs.existsSync(rootPath)) {
         fs.mkdirSync(rootPath, { recursive: true });

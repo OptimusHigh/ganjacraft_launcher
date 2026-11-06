@@ -177,8 +177,9 @@ async function checkAndDownloadJava(dataDir, sendLog, options = {}) {
         throw new Error('CANCELLED');
     }
 
-    const runtimeDir = path.join(dataDir, 'runtime');
-    const javaDir = path.join(runtimeDir, 'java');
+    // Java is profile-local so every build is self-contained on the selected disk.
+    const runtimeDir = path.join(dataDir, 'java');
+    const javaDir = runtimeDir;
 
     // 1. Check if local java exists
     const javaExec = process.platform === 'win32'
@@ -202,25 +203,14 @@ async function checkAndDownloadJava(dataDir, sendLog, options = {}) {
         throw new Error('CANCELLED');
     }
 
-    // 2. Check for System Java (must satisfy the selected profile requirement)
-    try {
-        const systemJava = await checkSystemJava();
-        if (systemJava && systemJava.major >= requiredJavaMajor) {
-            sendLog(`Найдена системная Java (подходит): Java ${systemJava.major}`);
-            return systemJava.command; // typically 'java'
-        } else if (systemJava) {
-            sendLog(`Системная Java ${systemJava.major} ниже требуемой Java ${requiredJavaMajor}. Скачивание Java ${requiredJavaMajor} JRE...`);
-        }
-    } catch (e) {
-        // Ignore error, proceed to download
-    }
-
+    // Do not fall back to system Java: the profile must remain portable and
+    // keep its runtime on the same disk as the game files.
     if (signal && signal.aborted) {
         throw new Error('CANCELLED');
     }
 
     // 3. Download if not found (or system Java is too old)
-    sendLog(`Подходящая Java не найдена. Скачивание JRE ${requiredJavaMajor}...`);
+    sendLog(`Локальная Java не найдена. Скачивание JRE ${requiredJavaMajor} в ${javaDir}...`);
 
     if (!fs.existsSync(runtimeDir)) fs.mkdirSync(runtimeDir, { recursive: true });
 
@@ -241,20 +231,26 @@ async function checkAndDownloadJava(dataDir, sendLog, options = {}) {
         const files = fs.readdirSync(runtimeDir);
         const extractedFolder = files.find(f => {
             const fullPath = path.join(runtimeDir, f);
-            return fs.statSync(fullPath).isDirectory() && f !== 'java';
+            return fs.statSync(fullPath).isDirectory() && f !== 'bin';
         });
 
         if (extractedFolder) {
             const fullExtractedPath = path.join(runtimeDir, extractedFolder);
-            // Rename to 'java'
-            if (fs.existsSync(javaDir)) fs.rmSync(javaDir, { recursive: true, force: true });
+            // Flatten the archive into <profile>/java for a stable portable path.
+            const extractedBin = path.join(fullExtractedPath, 'bin');
+            if (fs.existsSync(extractedBin)) {
+                for (const entry of fs.readdirSync(fullExtractedPath)) {
+                    fs.renameSync(path.join(fullExtractedPath, entry), path.join(runtimeDir, entry));
+                }
+                fs.rmSync(fullExtractedPath, { recursive: true, force: true });
+            }
 
             // Retry loop for rename (sometimes antivirus or file locks delay it)
             let retries = 3;
             while (retries > 0) {
                 if (signal && signal.aborted) throw new Error('CANCELLED');
                 try {
-                    fs.renameSync(fullExtractedPath, javaDir);
+                    if (fs.existsSync(fullExtractedPath)) fs.rmSync(fullExtractedPath, { recursive: true, force: true });
                     break;
                 } catch (e) {
                     retries--;

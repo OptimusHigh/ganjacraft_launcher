@@ -19,7 +19,7 @@ let currentUsername = '';
 export async function checkSavedAuth() {
     // Small delay to ensure Electron has loaded localStorage from leveldb
     await new Promise(r => setTimeout(r, 100));
-    
+
     const savedUser = localStorage.getItem('auth_user');
     const savedToken = localStorage.getItem('auth_token');
 
@@ -29,34 +29,34 @@ export async function checkSavedAuth() {
             // Server returns { success: true } not { valid: true }
             if (result.success) {
                 currentUsername = savedUser;
-                
+
                 // Update admin status from server
                 if (result.is_admin) {
                     localStorage.setItem('is_admin', 'true');
                 } else {
                     localStorage.removeItem('is_admin');
                 }
-                
+
                 appState.update('auth', {
                     isLoggedIn: true,
                     username: savedUser,
                     token: savedToken,
                     isAdmin: !!result.is_admin
                 });
-                
+
                 hideLoginStep();
-                showPlayScreen();
+                await showBuildSelection();
                 return true;
             }
         } catch (e) {
             console.warn('[AUTH] Token check failed:', e);
         }
-        
+
         // Token invalid, clear
         localStorage.removeItem('auth_user');
         localStorage.removeItem('auth_token');
     }
-    
+
     // No valid auth - show login screen
     showLoginScreen();
     return false;
@@ -71,7 +71,7 @@ export async function requestAuthCode(username) {
         showError('login-error', 'Пожалуйста, введите никнейм');
         return { success: false };
     }
-    
+
     try {
         const result = await window.api.requestAuth(username);
         if (result.success) {
@@ -97,7 +97,7 @@ export async function verifyAuthCode(code) {
     if (!code.trim()) {
         return { success: false, error: 'Введите код' };
     }
-    
+
     try {
         const result = await window.api.verifyAuth(currentUsername, code);
         if (result.success) {
@@ -112,14 +112,14 @@ export async function verifyAuthCode(code) {
             } else {
                 localStorage.removeItem('is_admin');
             }
-            
+
             appState.update('auth', {
                 isLoggedIn: true,
                 username: currentUsername,
                 token: result.token,
                 isAdmin: !!result.is_admin
             });
-            
+
             return { success: true };
         } else {
             showError('code-error', result.error || 'Неверный код');
@@ -139,15 +139,15 @@ export async function verifyAuthCode(code) {
 export function logout() {
     localStorage.removeItem('auth_user');
     localStorage.removeItem('auth_token');
-    
+
     appState.update('auth', {
         isLoggedIn: false,
         username: null,
         token: null
     });
-    
+
     currentUsername = '';
-    
+
     // Reload to reset UI
     location.reload();
 }
@@ -239,16 +239,26 @@ export async function loadPlayerStats(username) {
     if (playtimeEl) playtimeEl.textContent = '0 ч';
 }
 
+async function showBuildSelection() {
+    // Profile selection is intentionally kept on the regular dashboard.
+    // The first authenticated screen must not silently choose a build.
+    hideLoadingStep();
+    const selection = dom.get('step-build-selection');
+    if (selection) selection.classList.add('hidden');
+    showPlayScreen();
+    window.dispatchEvent(new CustomEvent('auth-ready'));
+}
+
 function showPlayScreen() {
     console.log('[AUTH] showPlayScreen() entered for user:', currentUsername);
     hideLoadingStep();
     const stepPlay = dom.get('step-play');
-    
+
     if (stepPlay) {
         stepPlay.classList.remove('hidden');
         stepPlay.classList.add('fade-in');
     }
-    
+
     // Инициализируем 3D/2D скин игрока
     if (currentUsername) {
         console.log('[AUTH] Calling initSkinViewer for:', currentUsername);
@@ -272,7 +282,7 @@ export async function loginWithPassword(password) {
         showError('password-error', 'Введите пароль');
         return { success: false };
     }
-    
+
     try {
         const result = await window.api.passwordAuth(currentUsername, password);
         if (result.success) {
@@ -285,14 +295,14 @@ export async function loginWithPassword(password) {
             } else {
                 localStorage.removeItem('is_admin');
             }
-            
+
             appState.update('auth', {
                 isLoggedIn: true,
                 username: currentUsername,
                 token: result.token,
                 isAdmin: !!result.is_admin
             });
-            
+
             return { success: true };
         } else {
             showError('password-error', result.message || result.error || 'Неверный пароль');
@@ -321,7 +331,7 @@ export function initAuthHandlers() {
     const stepPassword = dom.get('step-password');
     const switchToPassBtn = dom.get('switch-to-pass-btn');
     const switchToCodeBtn = dom.get('switch-to-code-btn');
-    
+
     // Switch buttons
     if (switchToPassBtn && stepCode && stepPassword) {
         switchToPassBtn.addEventListener('click', () => {
@@ -331,7 +341,7 @@ export function initAuthHandlers() {
             passwordInput?.focus();
         });
     }
-    
+
     if (switchToCodeBtn && stepCode && stepPassword) {
         switchToCodeBtn.addEventListener('click', () => {
             stepPassword.classList.add('hidden');
@@ -345,10 +355,10 @@ export function initAuthHandlers() {
     if (loginBtn && usernameInput) {
         loginBtn.addEventListener('click', async () => {
             const username = usernameInput.value.trim();
-            
+
             loginBtn.disabled = true;
             loginBtn.innerText = '...';
-            
+
             try {
                 const result = await requestAuthCode(username);
                 if (result.success) {
@@ -356,7 +366,7 @@ export function initAuthHandlers() {
                     stepCode.classList.remove('hidden');
                     stepCode.classList.add('fade-in');
                     codeInput?.focus();
-                    
+
                     if (switchToPassBtn) {
                         switchToPassBtn.style.display = result.has_password ? '' : 'none';
                     }
@@ -365,7 +375,7 @@ export function initAuthHandlers() {
                     if (result.status === 404 || result.status === 403) {
                         return;
                     }
-                    
+
                     // Do not fallback to password if the user doesn't have a password set
                     if (result.has_password) {
                         // Fast fallback: if requesting code failed (e.g. 409 no TG linked, 500 bot down, 0 network error), show password step automatically
@@ -381,7 +391,7 @@ export function initAuthHandlers() {
                 usernameInput.focus();
             }
         });
-        
+
         // Enter key support
         usernameInput.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') {
@@ -389,21 +399,21 @@ export function initAuthHandlers() {
             }
         });
     }
-    
+
     // Verify button
     if (verifyBtn && codeInput) {
         verifyBtn.addEventListener('click', async () => {
             const code = codeInput.value.trim();
             if (!code) return;
-            
+
             verifyBtn.disabled = true;
             verifyBtn.innerText = 'Проверка...';
-            
+
             try {
                 const result = await verifyAuthCode(code);
                 if (result.success) {
                     stepCode.classList.add('hidden');
-                    showPlayScreen();
+                    await showBuildSelection();
                 }
             } finally {
                 if (!appState.get('auth.isLoggedIn')) {
@@ -412,7 +422,7 @@ export function initAuthHandlers() {
                 }
             }
         });
-        
+
         // Enter key support
         codeInput.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') {
@@ -420,21 +430,21 @@ export function initAuthHandlers() {
             }
         });
     }
-    
+
     // Password Login button
     if (passLoginBtn && passwordInput) {
         passLoginBtn.addEventListener('click', async () => {
             const password = passwordInput.value.trim();
             if (!password) return;
-            
+
             passLoginBtn.disabled = true;
             passLoginBtn.innerText = 'Вход...';
-            
+
             try {
                 const result = await loginWithPassword(password);
                 if (result.success) {
                     stepPassword.classList.add('hidden');
-                    showPlayScreen();
+                    await showBuildSelection();
                 }
             } finally {
                 if (!appState.get('auth.isLoggedIn')) {
@@ -443,7 +453,7 @@ export function initAuthHandlers() {
                 }
             }
         });
-        
+
         // Enter key support
         passwordInput.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') {

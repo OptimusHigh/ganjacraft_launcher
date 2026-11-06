@@ -178,9 +178,11 @@ export async function loadChangelogHistory(profileId = window.__activeBuildProfi
 
         checkChangelogBadge();
         renderChangelogList();
+        renderChangelogList('dashboard-changelog-list');
     } catch (e) {
         console.warn('[Changelog] Failed to load history:', e);
-        renderEmptyState('Ошибка загрузки истории обновлений');
+        renderEmptyState('Ошибка загрузки истории обновлений', 'changelog-list');
+        renderEmptyState('Ошибка загрузки обновлений', 'dashboard-changelog-list');
     }
 }
 
@@ -207,6 +209,11 @@ export function checkChangelogBadge() {
         return;
     }
 
+    // The dashboard and the dedicated changelog tab share the same feed.
+    // Keep the bell available after the user has seen the latest item; only
+    // the unread badge should disappear.
+    if (btnChangelog) btnChangelog.classList.remove('hidden');
+
     const compoundId = getLatestCompoundId();
     const seenId = localStorage.getItem(STORAGE_KEY_SEEN);
     const hasUnseen = Boolean(compoundId && seenId !== compoundId);
@@ -215,7 +222,6 @@ export function checkChangelogBadge() {
         if (btnChangelog) btnChangelog.classList.remove('hidden');
         if (badge) badge.classList.remove('hidden');
     } else {
-        if (btnChangelog) btnChangelog.classList.add('hidden');
         if (badge) badge.classList.add('hidden');
     }
 }
@@ -236,8 +242,8 @@ export function markChangelogSeen() {
 /**
  * Рендер карточек объединённой истории обновлений и новостей
  */
-export function renderChangelogList() {
-    const container = dom.get('changelog-list');
+export function renderChangelogList(containerId = 'changelog-list') {
+    const container = dom.get(containerId);
     if (!container) return;
 
     const allItems = [];
@@ -264,7 +270,7 @@ export function renderChangelogList() {
         });
     });
 
-    // 3. Новости Telegram / бота
+    // 3. Новости из подключённого новостного источника (включая VK)
     cachedNews.forEach((newsItem) => {
         let ts = newsItem.timestamp ? Number(newsItem.timestamp) : 0;
         if (!ts && newsItem.created_at) {
@@ -287,7 +293,7 @@ export function renderChangelogList() {
     allItems.sort((a, b) => b.timestamp - a.timestamp);
 
     if (allItems.length === 0) {
-        renderEmptyState('История обновлений и новостей пока пуста');
+        renderEmptyState('История обновлений и новостей пока пуста', containerId);
         return;
     }
 
@@ -348,7 +354,7 @@ export function renderChangelogList() {
 }
 
 /**
- * Рендер карточки новости из Telegram-канала / бота
+ * Рендер карточки новости из новостного источника (включая VK)
  */
 function renderNewsCardHtml(item, isLatest) {
     const formattedDate = formatReleaseDate(item.created_at, item.timestamp);
@@ -799,14 +805,14 @@ function renderModCard(item, actionType) {
 /**
  * Отрендерить состояние пустой истории
  */
-function renderEmptyState(message) {
-    const container = dom.get('changelog-list');
+function renderEmptyState(message, containerId = 'changelog-list') {
+    const container = dom.get(containerId);
     if (!container) return;
 
     container.innerHTML = `
         <div class="changelog-empty-state">
             <div class="empty-icon">📦</div>
-            <div class="empty-title">${message || 'История обновлений пока пуста'}</div>
+            <div class="empty-title">${escapeHtml(message || 'История обновлений пока пуста')}</div>
             <div class="empty-desc">
                 Все добавленные, обновлённые и удалённые моды сборки, конфиги, рецепты и релизы лаунчера будут автоматически появляться здесь.
             </div>
