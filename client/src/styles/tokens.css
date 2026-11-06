@@ -3,6 +3,23 @@
    Единая система переменных. Все цвета, размеры и анимации — только отсюда.
    ========================================================================== */
 
+/* ── Нативный кубический шрифт Minecraft с полной поддержкой кириллицы ── */
+@font-face {
+    font-family: 'Minecraft';
+    src: url('../assets/MinecraftDefault-Regular.ttf') format('truetype');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Minecraft';
+    src: url('../assets/MinecraftDefault-Regular.ttf') format('truetype');
+    font-weight: 700;
+    font-style: normal;
+    font-display: swap;
+}
+
 :root {
     /* ── Brand Colors ── */
     --gc-green: #39ff14;
@@ -117,7 +134,7 @@
     --gc-font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     --gc-font-display: 'Outfit', 'Inter', sans-serif;
     --gc-font-mono: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
-    --gc-font-minecraft: 'Minecraft', 'Pixelify Sans', 'Minecraftia', 'Silkscreen', 'Press Start 2P', monospace;
+    --gc-font-minecraft: 'Minecraft', monospace;
 
     /* ── Transitions & Easing ── */
     --gc-ease-standard: cubic-bezier(0.25, 0.46, 0.45, 0.94);

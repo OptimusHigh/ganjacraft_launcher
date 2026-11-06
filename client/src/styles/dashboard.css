@@ -191,12 +191,12 @@
     background: rgba(0, 0, 0, 0.52);
     padding: 4px 11px;
     border-radius: 3px;
-    font-family: var(--gc-font-minecraft, 'Minecraft', 'Pixelify Sans', 'Minecraftia', monospace);
-    font-size: 17px;
+    font-family: var(--gc-font-minecraft, 'Minecraft', monospace);
+    font-size: 16px;
+    font-weight: normal;
     line-height: 1.25;
     -webkit-font-smoothing: none;
     image-rendering: pixelated;
-    font-smooth: never;
     letter-spacing: 0.6px;
     pointer-events: none;
     user-select: none;
@@ -205,13 +205,13 @@
 
 .minecraft-nametag .minecraft-rank-badge,
 .minecraft-nametag .player-rank-pill {
-    font-weight: 700;
+    font-weight: normal;
     color: #55ff55;
     text-shadow: 2px 2px 0px rgba(0, 0, 0, 0.9);
 }
 
 .minecraft-nametag .minecraft-player-name {
-    font-weight: 600;
+    font-weight: normal;
     color: #ffffff;
     text-shadow: 2px 2px 0px rgba(0, 0, 0, 0.9);
 }
@@ -316,21 +316,24 @@
 }
 
 .stat-label-text {
-    font-family: var(--gc-font-display);
-    font-size: 10px;
-    font-weight: 700;
-    letter-spacing: 0.9px;
+    font-family: var(--gc-font-minecraft, 'Minecraft', monospace);
+    font-size: 11px;
+    font-weight: normal;
+    letter-spacing: 0.8px;
     color: var(--gc-text-muted);
     text-transform: uppercase;
+    -webkit-font-smoothing: none;
 }
 
 .stat-value-text {
-    font-family: var(--gc-font-display);
-    font-size: 16px;
-    font-weight: 800;
+    font-family: var(--gc-font-minecraft, 'Minecraft', monospace);
+    font-size: 15px;
+    font-weight: normal;
     color: var(--gc-text-white);
-    letter-spacing: 0.4px;
+    letter-spacing: 0.5px;
     line-height: 1.1;
+    text-shadow: 1px 1px 0px rgba(0, 0, 0, 0.85);
+    -webkit-font-smoothing: none;
 }
 
 .stat-divider-line {
@@ -412,12 +415,14 @@ body.is-game-launching .launch-action-hub,
 
 .build-selector-label {
     color: rgba(220, 255, 220, 0.72);
-    font-family: var(--gc-font-display, 'Outfit', sans-serif);
-    font-size: 9px;
-    font-weight: 800;
-    letter-spacing: 1.4px;
+    font-family: var(--gc-font-minecraft, 'Minecraft', monospace);
+    font-size: 11px;
+    font-weight: normal;
+    letter-spacing: 1px;
     line-height: 1;
     text-transform: uppercase;
+    text-shadow: 1px 1px 0px rgba(0, 0, 0, 0.85);
+    -webkit-font-smoothing: none;
 }
 
 .build-profile-select {
@@ -431,10 +436,11 @@ body.is-game-launching .launch-action-hub,
     border-radius: var(--gc-radius-sm, 6px);
     box-shadow: 0 0 14px rgba(57, 255, 20, 0.12), inset 0 0 0 1px rgba(0, 0, 0, 0.35);
     cursor: pointer;
-    font-family: var(--gc-font-display, 'Outfit', sans-serif);
-    font-size: 12px;
-    font-weight: 700;
+    font-family: var(--gc-font-minecraft, 'Minecraft', monospace);
+    font-size: 14px;
+    font-weight: normal;
     outline: none;
+    -webkit-font-smoothing: none;
     transition: border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
 }
 
@@ -478,10 +484,12 @@ body.is-game-launching .launch-action-hub,
     border: 1.5px solid var(--gc-green, #39ff14);
     border-radius: var(--gc-radius-md, 8px);
     color: #ffffff;
-    font-family: var(--gc-font-display, 'Outfit', sans-serif);
-    font-size: 15px;
-    font-weight: 800;
-    letter-spacing: 2.2px;
+    font-family: var(--gc-font-minecraft, 'Minecraft', monospace);
+    font-size: 16px;
+    font-weight: normal;
+    letter-spacing: 2px;
+    text-shadow: 1.5px 1.5px 0px rgba(0, 0, 0, 0.85);
+    -webkit-font-smoothing: none;
     text-transform: uppercase;
     cursor: pointer;
     outline: none;
@@ -582,10 +590,10 @@ body.is-game-launching .launch-action-hub,
 /* ── 4. Right: Server Status Hub (Pinned to Top Right) ── */
 .launch-action-hub {
     position: absolute;
-    top: 24px;
-    right: 28px;
+    top: 20px;
+    right: 24px;
     width: auto;
-    max-width: 260px;
+    max-width: 230px;
     height: auto;
     display: flex;
     flex-direction: column;
@@ -593,9 +601,7 @@ body.is-game-launching .launch-action-hub,
     align-items: flex-end;
     box-sizing: border-box;
     z-index: 15;
-    padding: 2px 0 4px 0;
-    transform: scale(0.9);
-    transform-origin: top right;
+    padding: 0;
     pointer-events: none;
 }
 
@@ -616,7 +622,7 @@ body.is-game-launching .launch-action-hub,
     border-radius: 0;
     box-shadow: none !important;
     padding: 0 !important;
-    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    transition: all 0.2s ease;
 }
 
 .server-live-card-modern:not(.has-players),
@@ -630,24 +636,72 @@ body.is-game-launching .launch-action-hub,
     height: auto !important;
 }
 
-/* ── Multi-server status display ── */
+/* ── Multi-server status display as spoilers ── */
 .servers-status-list {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 5px;
     align-items: flex-end;
     width: 100%;
-    padding: 2px 0;
+    padding: 0;
+    -webkit-font-smoothing: none;
+    image-rendering: pixelated;
 }
 
-.server-status-item {
+/* ── Server Spoiler Card ── */
+.server-spoiler-card {
+    display: flex;
+    flex-direction: column;
+    width: 210px;
+    background: rgba(10, 16, 12, 0.78);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: var(--gc-radius-sm, 6px);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    overflow: hidden;
+    transition: border-color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
+    box-sizing: border-box;
+}
+
+.server-spoiler-card:hover {
+    border-color: rgba(57, 255, 20, 0.35);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6), 0 0 10px rgba(57, 255, 20, 0.1);
+}
+
+.server-spoiler-card.is-active {
+    border-color: rgba(57, 255, 20, 0.5);
+    background: rgba(10, 22, 14, 0.9);
+    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.65), 0 0 12px rgba(57, 255, 20, 0.18);
+}
+
+.server-spoiler-card.is-offline {
+    opacity: 0.7;
+    border-color: rgba(255, 255, 255, 0.06);
+}
+
+/* Header / Toggle Button */
+.server-spoiler-header {
     display: flex;
     align-items: center;
-    justify-content: flex-end;
-    gap: 10px;
+    justify-content: space-between;
     width: 100%;
+    padding: 5px 8px;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    user-select: none;
+    outline: none;
+    transition: background 0.15s ease;
+    gap: 6px;
+    box-sizing: border-box;
 }
 
+.server-spoiler-header:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.server-spoiler-title-wrap,
 .server-status-header {
     display: inline-flex;
     align-items: center;
@@ -655,43 +709,64 @@ body.is-game-launching .launch-action-hub,
 }
 
 .server-status-title {
-    font-family: var(--gc-font-display);
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 1.4px;
-    color: var(--gc-text-muted);
+    font-family: var(--gc-font-minecraft, 'Minecraft', monospace);
+    font-size: 14px;
+    font-weight: normal;
+    color: #f1f5f9;
+    letter-spacing: 0.5px;
     text-transform: uppercase;
-    transition: color 0.2s ease;
+    text-shadow: 1px 1px 0px rgba(0, 0, 0, 0.95);
+    -webkit-font-smoothing: none;
+    transition: color 0.15s ease;
+}
+
+.server-spoiler-card.is-active .server-status-title {
+    color: #ffffff;
+    text-shadow: 0 0 8px rgba(57, 255, 20, 0.6), 1px 1px 0 #000;
+}
+
+.server-spoiler-header.is-offline .server-status-title,
+.server-status-item.is-offline .server-status-title {
+    color: #888;
+}
+
+.server-spoiler-meta,
+.server-status-meta {
+    display: flex;
+    align-items: center;
+    gap: 6px;
 }
 
 .server-status-count {
-    font-family: var(--gc-font-display);
-    font-size: 18px;
-    font-weight: 800;
-    color: var(--gc-text-white);
-    letter-spacing: 0.5px;
-    line-height: 1.1;
-    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
-    min-width: 58px;
+    font-family: var(--gc-font-minecraft, 'Minecraft', monospace);
+    font-size: 14px;
+    font-weight: normal;
+    color: var(--gc-green, #39ff14);
+    letter-spacing: 0.4px;
+    text-shadow: 1px 1px 0px rgba(0, 0, 0, 0.95);
+    min-width: 44px;
     text-align: right;
+    -webkit-font-smoothing: none;
 }
 
-.server-status-item.is-active .server-status-title {
-    color: #fff;
-    text-shadow: 0 0 10px rgba(57, 255, 20, 0.4);
-}
-
-.server-status-item.is-offline .server-status-title {
-    color: #666;
-}
-
+.server-spoiler-header.is-offline .server-status-count,
 .server-status-item.is-offline .server-status-count {
-    color: #666;
+    color: #888;
     font-size: 12px;
-    font-weight: 700;
-    letter-spacing: 0.8px;
 }
 
+.server-spoiler-arrow {
+    color: var(--gc-text-muted, #94a3b8);
+    transition: transform 0.2s ease, color 0.15s ease;
+    flex-shrink: 0;
+}
+
+.server-spoiler-card.is-open .server-spoiler-arrow {
+    transform: rotate(180deg);
+    color: var(--gc-green, #39ff14);
+}
+
+/* Status Indicator Dot */
 .status-indicator-dot {
     width: 7px;
     height: 7px;
@@ -712,93 +787,96 @@ body.is-game-launching .launch-action-hub,
     animation: none;
 }
 
-.server-live-card-modern:not(.has-players) .server-card-divider,
-.server-live-card-modern.empty-card .server-card-divider,
-.server-live-card-modern:not(.has-players) .server-players-live-list,
-.server-live-card-modern.empty-card .server-players-live-list {
-    display: none !important;
+/* Spoiler Body (Collapsible) */
+.server-spoiler-body {
+    display: none;
+    flex-direction: column;
+    padding: 3px 6px 6px 6px;
+    gap: 4px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(0, 0, 0, 0.32);
+    box-sizing: border-box;
 }
 
-/* ── Live Players List (When Players ARE Online) ── */
-.server-live-card-modern.has-players {
-    background: transparent !important;
-    border: none !important;
-    box-shadow: none !important;
-    height: 100%;
+.server-spoiler-card.is-open .server-spoiler-body {
+    display: flex;
 }
 
-.server-live-card-modern.has-players .server-card-divider {
-    display: block;
-    width: 100%;
-    height: 1px;
-    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.12), rgba(57, 255, 20, 0.2));
-    margin: 10px 0 8px 0;
-    flex-shrink: 0;
-}
-
-.server-live-card-modern.has-players .server-players-live-list {
+.server-players-live-list {
     display: flex;
     flex-direction: column;
-    gap: 6px;
-    width: 100%;
-    flex: 1 1 auto;
-    max-height: 380px;
+    gap: 3px;
+    max-height: 160px;
     overflow-y: auto;
     padding-right: 2px;
 }
 
+.server-empty-hint {
+    font-family: var(--gc-font-minecraft, 'Minecraft', monospace);
+    font-size: 12px;
+    font-weight: normal;
+    color: var(--gc-text-muted, #94a3b8);
+    text-align: center;
+    padding: 4px 0 2px 0;
+    -webkit-font-smoothing: none;
+    text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.9);
+}
+
+/* ── Live Player Item (Within Server Spoiler) ── */
 .live-player-item {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 6px 8px;
-    border-radius: var(--gc-radius-sm);
-    background: rgba(18, 24, 28, 0.6);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    gap: 6px;
+    padding: 3px 6px;
+    border-radius: 4px;
+    background: rgba(18, 24, 28, 0.8);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: all 0.15s ease;
     box-sizing: border-box;
     cursor: default;
 }
 
 .live-player-item:hover {
-    background: rgba(var(--gc-green-rgb), 0.12);
-    border-color: rgba(var(--gc-green-rgb), 0.35);
-    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4), 0 0 10px rgba(var(--gc-green-rgb), 0.15);
-    transform: translateX(-3px);
+    background: rgba(57, 255, 20, 0.14);
+    border-color: rgba(57, 255, 20, 0.4);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+    transform: translateX(-1px);
 }
 
 .live-player-avatar-wrap {
     width: 22px;
     height: 22px;
-    border-radius: var(--gc-radius-xs);
+    border-radius: 3px;
     overflow: hidden;
     background: #111;
     display: flex;
     align-items: center;
     justify-content: center;
-    border: 1px solid rgba(255, 255, 255, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.2);
     flex-shrink: 0;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
 }
 
-.live-player-avatar {
+.live-player-head-canvas {
     width: 100%;
     height: 100%;
-    object-fit: cover;
     image-rendering: pixelated;
+    image-rendering: -moz-crisp-edges;
+    image-rendering: crisp-edges;
+    display: block;
 }
 
 .live-player-name {
     font-family: var(--gc-font-minecraft, 'Minecraft', monospace);
-    font-size: 12px;
-    font-weight: 600;
+    font-size: 13px;
+    font-weight: normal;
     color: #f8fafc;
     letter-spacing: 0.3px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    text-shadow: 1.5px 1.5px 0px rgba(0, 0, 0, 0.85);
+    text-shadow: 1.5px 1.5px 0px rgba(0, 0, 0, 0.95);
+    -webkit-font-smoothing: none;
 }
 
 /* Logout Button */
@@ -875,11 +953,12 @@ body.is-game-launching .launch-action-hub,
     position: absolute;
     bottom: 16px;
     right: 16px;
-    font-family: var(--gc-font-mono);
+    font-family: var(--gc-font-minecraft, 'Minecraft', monospace);
     font-size: 13px;
-    font-weight: 600;
+    font-weight: normal;
     color: rgba(255, 255, 255, 0.45);
     letter-spacing: 0.8px;
+    -webkit-font-smoothing: none;
     z-index: var(--gc-z-ui);
     pointer-events: none;
     user-select: none;

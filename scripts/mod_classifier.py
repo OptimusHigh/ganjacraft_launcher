@@ -42,7 +42,7 @@ KNOWN_SERVER_ONLY: Set[str] = {
     "essential_commands", "luckperms", "serverreplay", "ledger",
     "styled-chat", "styled_chat", "styled-nicknames", "styledplayerlist",
     "viperantixray", "meowantixray", "mtsanticheat", "floodgate", "geyser",
-    "servercore", "spark", "ftb-essentials", "ftbessentials", "invview", "slashloot",
+    "servercore", "spark", "invview", "slashloot",
     "fabric-carpet", "packet_fixer", "leavesbegone", "leaves-be-gone", "leaves_be_gone",
     "zfastnoise", "fastnoise", "fast_noise", "ksyxis", "dungeoncrawl", "dungeon_crawl", "async"
 }
@@ -59,7 +59,7 @@ KNOWN_CLIENT_ONLY: Set[str] = {
     "betteradvancements", "shulkerboxtooltip", "advanced-xray", "xray",
     "reeses", "continuity", "variants-cit", "sound-physics", "sound_physics",
     "spawnanimations", "spawn-animations", "windy", "configsearch",
-    "clickthrough", "cutthrough", "better-advanced-tooltips", "asyncparticles"
+    "clickthrough", "cutthrough", "asyncparticles"
 }
 
 KNOWN_CLIENT_OPTIONAL: Set[str] = {

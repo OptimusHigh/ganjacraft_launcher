@@ -27,10 +27,13 @@
 /* ── Title Bar Tabs (shared for settings & changelog) ── */
 #title-bar .tab-btn,
 #title-bar-title {
-    font-size: var(--gc-font-md);
+    font-family: var(--gc-font-minecraft, 'Minecraft', monospace);
+    font-size: 14px;
     color: #9aa2b0;
-    font-weight: 700;
+    font-weight: normal;
     letter-spacing: 0.8px;
+    text-shadow: 1px 1px 0px rgba(0, 0, 0, 0.85);
+    -webkit-font-smoothing: none;
     white-space: nowrap;
     user-select: none;
     background: transparent !important;

@@ -7,5 +7,8 @@ export {
     startStatusChecker,
     stopStatusChecker,
     initBuildProfileSelector,
-    setServerProfile
+    setServerProfile,
+    openServerSpoiler,
+    toggleServerSpoiler,
+    renderPlayerHead
 } from './server-status.js';

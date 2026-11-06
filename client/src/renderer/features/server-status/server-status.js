@@ -1,6 +1,6 @@
 /**
  * Ganj4Craft Launcher - Server Status Feature
- * Проверка статуса сервера + список игроков при наведении
+ * Статус серверов + спойлеры онлайн игроков с нативным 2D рендером голов
  */
 
 import { dom } from '../../utils/dom.js';
@@ -11,6 +11,101 @@ const STATUS_UPDATE_INTERVAL = 60000; // 60 секунд
 let statusInterval = null;
 let activeProfile = null;
 let availableProfiles = [];
+let spoilersInitialized = false;
+
+// Кэш сгенерированных голов игроков (offscreen canvas)
+const headCache = new Map();
+
+/**
+ * Отрисовка пиксель-перфект лица Стива (фоллбэк)
+ */
+function drawSteveHead(ctx, size) {
+    const p = size / 8;
+    // Волосы
+    ctx.fillStyle = '#49311c';
+    ctx.fillRect(0, 0, size, p * 2);
+    ctx.fillRect(0, p * 2, p, p);
+    ctx.fillRect(p * 7, p * 2, p, p);
+    // Кожа лица
+    ctx.fillStyle = '#b88360';
+    ctx.fillRect(p, p * 2, p * 6, p * 6);
+    ctx.fillRect(0, p * 3, p, p * 5);
+    ctx.fillRect(p * 7, p * 3, p, p * 5);
+    // Глаза
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(p, p * 4, p * 2, p);
+    ctx.fillRect(p * 5, p * 4, p * 2, p);
+    ctx.fillStyle = '#2b3bb3';
+    ctx.fillRect(p * 2, p * 4, p, p);
+    ctx.fillRect(p * 5, p * 4, p, p);
+    // Нос
+    ctx.fillStyle = '#9e6745';
+    ctx.fillRect(p * 3, p * 5, p * 2, p);
+    // Рот и борода
+    ctx.fillStyle = '#59321c';
+    ctx.fillRect(p * 2, p * 6, p * 4, p);
+    ctx.fillRect(p * 3, p * 7, p * 2, p);
+}
+
+/**
+ * Рендер головы игрока на Canvas (лицо 8x8 + шлем 8x8 оверлей)
+ */
+export function renderPlayerHead(canvas, username) {
+    if (!canvas || !username) return;
+    const ctx = canvas.getContext('2d');
+    ctx.imageSmoothingEnabled = false;
+
+    // Проверяем кэш
+    const cached = headCache.get(username);
+    if (cached) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(cached, 0, 0, canvas.width, canvas.height);
+        return;
+    }
+
+    // Мгновенный фоллбэк на Стива, пока грузится скин
+    drawSteveHead(ctx, canvas.width);
+
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+
+    img.onload = () => {
+        try {
+            const offscreen = document.createElement('canvas');
+            offscreen.width = 32;
+            offscreen.height = 32;
+            const offCtx = offscreen.getContext('2d');
+            offCtx.imageSmoothingEnabled = false;
+
+            // 1. Базовый слой головы (x=8, y=8, w=8, h=8)
+            offCtx.drawImage(img, 8, 8, 8, 8, 0, 0, 32, 32);
+
+            // 2. Внешний слой / шлем (x=40, y=8, w=8, h=8)
+            offCtx.drawImage(img, 40, 8, 8, 8, 0, 0, 32, 32);
+
+            headCache.set(username, offscreen);
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(offscreen, 0, 0, canvas.width, canvas.height);
+        } catch (e) {
+            console.warn('[Avatar] Failed to crop head for', username, e);
+        }
+    };
+
+    img.onerror = () => {
+        // Фоллбэк на mc-heads.net, если локальный скин отсутствует
+        const fallback = new Image();
+        fallback.crossOrigin = 'anonymous';
+        fallback.onload = () => {
+            headCache.set(username, fallback);
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(fallback, 0, 0, canvas.width, canvas.height);
+        };
+        fallback.src = `https://mc-heads.net/avatar/${encodeURIComponent(username)}/32`;
+    };
+
+    img.src = `${API_BASE}/skins/${encodeURIComponent(username)}.png`;
+}
 
 export function setServerProfile(profile) {
     activeProfile = profile?.id ? {
@@ -21,11 +116,14 @@ export function setServerProfile(profile) {
         serverPort: Number(profile.serverPort) || 25565,
     } : null;
     updateActiveServerHighlight();
+    openServerSpoiler(activeProfile?.id);
 }
 
 export async function initBuildProfileSelector(config = {}) {
     const selector = document.getElementById('build-profile-selector');
     if (!selector || !window.api?.getBuildProfiles) return [];
+
+    initServerSpoilers();
 
     const profiles = await window.api.getBuildProfiles();
     if (!Array.isArray(profiles) || profiles.length === 0) return [];
@@ -76,6 +174,7 @@ export async function initBuildProfileSelector(config = {}) {
             window.__activeBuildProfileId = selected.id;
             localStorage.setItem('selected_build_profile', selected.id);
             setServerProfile(selected);
+            openServerSpoiler(selected.id);
             window.dispatchEvent(new CustomEvent('build-profile-changed', { detail: selected }));
         } catch (error) {
             console.error('[Profile] Failed to save selected build:', error);
@@ -102,76 +201,99 @@ function updatePlayAvailability() {
 }
 
 /**
- * Создать/обновить тултип с именами игроков
+ * Раскрыть спойлер сервера, соответствующего выбранному профилю
  */
-function buildTooltip(players) {
-    let tooltip = document.getElementById('players-tooltip');
-    if (!tooltip) {
-        tooltip = document.createElement('div');
-        tooltip.id = 'players-tooltip';
-        tooltip.className = 'players-tooltip';
-        document.body.appendChild(tooltip);
-    }
+export function openServerSpoiler(profileId) {
+    const targetKey = (profileId === 'vanilla' || profileId === 'minecraft-vanilla')
+        ? 'vanilla'
+        : 'ganj4craft5';
 
-    if (!players || players.length === 0) {
-        tooltip.innerHTML = '<span class="tooltip-empty">Нет игроков</span>';
-    } else {
-        tooltip.innerHTML = players
-            .map(p => {
-                const name = typeof p === 'string' ? p : (p?.name_clean || p?.name_raw || 'Игрок');
-                return `<span class="tooltip-player">⚔ ${name}</span>`;
-            })
-            .join('');
-    }
-    return tooltip;
+    ['vanilla', 'ganj4craft5'].forEach(sid => {
+        const card = document.getElementById(`server-card-${sid}`);
+        const header = document.getElementById(`server-status-${sid}`);
+        const shouldOpen = (sid === targetKey);
+
+        if (card) {
+            card.classList.toggle('is-open', shouldOpen);
+            card.classList.toggle('is-active', shouldOpen);
+        }
+        if (header) {
+            header.classList.toggle('is-active', shouldOpen);
+            header.setAttribute('aria-expanded', shouldOpen ? 'true' : 'false');
+        }
+    });
 }
 
 /**
- * Привязать тултип к элементу
+ * Переключить спойлер конкретного сервера вручную
  */
-function attachTooltip(target, players) {
-    if (!target) return;
-    const tooltip = buildTooltip(players);
-    target._playersTooltip = tooltip;
+export function toggleServerSpoiler(serverId) {
+    const card = document.getElementById(`server-card-${serverId}`);
+    const header = document.getElementById(`server-status-${serverId}`);
+    if (!card) return;
 
-    if (target._hasPlayersTooltipListeners) return;
-    target._hasPlayersTooltipListeners = true;
-
-    target.addEventListener('mouseenter', (e) => {
-        const currentTooltip = target._playersTooltip;
-        if (!currentTooltip) return;
-        currentTooltip.classList.add('visible');
-        positionTooltip(e, currentTooltip);
-    });
-
-    target.addEventListener('mousemove', (e) => {
-        const currentTooltip = target._playersTooltip;
-        if (currentTooltip) positionTooltip(e, currentTooltip);
-    });
-
-    target.addEventListener('mouseleave', () => {
-        const currentTooltip = target._playersTooltip;
-        if (currentTooltip) currentTooltip.classList.remove('visible');
-    });
-}
-
-function positionTooltip(e, tooltip) {
-    const x = e.clientX;
-    const y = e.clientY;
-    const rect = tooltip.getBoundingClientRect();
-    const winW = window.innerWidth;
-
-    let left = x + 12;
-    if (left + rect.width > winW - 8) {
-        left = x - rect.width - 12;
+    const isOpen = card.classList.toggle('is-open');
+    if (header) {
+        header.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
     }
-
-    tooltip.style.left = `${left}px`;
-    tooltip.style.top = `${y - rect.height / 2}px`;
 }
 
 /**
- * Обновить статус сервера
+ * Инициализировать интерактивные спойлеры серверов
+ */
+export function initServerSpoilers() {
+    if (spoilersInitialized) return;
+    spoilersInitialized = true;
+
+    ['vanilla', 'ganj4craft5'].forEach(sid => {
+        const header = document.getElementById(`server-status-${sid}`);
+        if (!header) return;
+
+        const clickHandler = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            toggleServerSpoiler(sid);
+        };
+
+        header.addEventListener('click', clickHandler);
+        header.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                clickHandler(e);
+            }
+        });
+    });
+
+    const activeId = activeProfile?.id || window.__activeBuildProfileId;
+    if (activeId) {
+        openServerSpoiler(activeId);
+    }
+}
+
+function updateActiveServerHighlight() {
+    const currentId = activeProfile?.id || window.__activeBuildProfileId;
+    const targetKey = (currentId === 'vanilla' || currentId === 'minecraft-vanilla')
+        ? 'vanilla'
+        : 'ganj4craft5';
+
+    ['vanilla', 'ganj4craft5'].forEach(sid => {
+        const card = document.getElementById(`server-card-${sid}`);
+        const header = document.getElementById(`server-status-${sid}`);
+        const isActive = (sid === targetKey);
+        if (card) card.classList.toggle('is-active', isActive);
+        if (header) header.classList.toggle('is-active', isActive);
+    });
+}
+
+if (typeof window !== 'undefined') {
+    window.addEventListener('build-profile-changed', (e) => {
+        const pid = e.detail?.id || window.__activeBuildProfileId;
+        updateActiveServerHighlight();
+        openServerSpoiler(pid);
+    });
+}
+
+/**
+ * Обновить статус серверов через внешний API mcstatus / mcsrvstat (fallback)
  */
 async function fetchServerStatus(profile) {
     const serverAddress = profile.serverPort === 25565
@@ -222,22 +344,8 @@ async function fetchServerStatus(profile) {
     return result;
 }
 
-function updateActiveServerHighlight() {
-    const currentId = activeProfile?.id || window.__activeBuildProfileId;
-    ['vanilla', 'ganj4craft5'].forEach(sid => {
-        const el = document.getElementById(`server-status-${sid}`);
-        if (el) {
-            el.classList.toggle('is-active', sid === currentId);
-        }
-    });
-}
-
-if (typeof window !== 'undefined') {
-    window.addEventListener('build-profile-changed', () => updateActiveServerHighlight());
-}
-
 /**
- * Прямой запрос статуса серверов через API бота (без сторонних сервисов)
+ * Прямой запрос статуса серверов через API бота
  */
 async function fetchServersFromApi() {
     try {
@@ -261,7 +369,7 @@ async function fetchServersFromApi() {
 }
 
 /**
- * Фолбэк опрос через внешние публичные сервисы (если бэкенд недоступен)
+ * Фолбэк опрос через внешние публичные сервисы
  */
 async function fetchFallbackStatuses() {
     if (!availableProfiles.length) return null;
@@ -283,23 +391,19 @@ async function fetchFallbackStatuses() {
 }
 
 /**
- * Отрисовка статуса серверов (VANILLA и THAUMPARTY)
+ * Отрисовка статуса серверов в спойлеры с карточками игроков
  */
 function renderServersStatus(serversMap) {
     if (!serversMap) return;
+    initServerSpoilers();
 
     const playerCount = dom.get('player-count');
     const indicator = document.querySelector('.status-indicator');
-    const liveCard = document.querySelector('.server-live-card-modern');
-    const mainLayout = document.querySelector('.main-dashboard-layout');
-    const livePlayersContainer = dom.get('live-players-container');
     const bottomCount = dom.get('bottom-player-count');
 
     let totalOnline = 0;
     let totalMax = 0;
     let anyOnline = false;
-    const allPlayers = [];
-    const seenPlayers = new Set();
 
     const serverKeys = ['vanilla', 'ganj4craft5'];
     for (const key of serverKeys) {
@@ -312,47 +416,85 @@ function renderServersStatus(serversMap) {
             players: []
         };
 
-        const rowEl = document.getElementById(`server-status-${key}`);
+        const cardEl = document.getElementById(`server-card-${key}`);
+        const headerEl = document.getElementById(`server-status-${key}`);
         const countEl = document.getElementById(`count-${key}`);
+        const playersListEl = document.getElementById(`players-list-${key}`);
 
         if (s.online) {
             anyOnline = true;
             totalOnline += s.online_count;
             totalMax += s.max_players;
 
-            if (rowEl) {
-                rowEl.classList.remove('is-offline');
-                const dot = rowEl.querySelector('.status-indicator-dot');
+            if (headerEl) {
+                headerEl.classList.remove('is-offline');
+                const dot = headerEl.querySelector('.status-indicator-dot');
                 if (dot) {
                     dot.className = 'status-indicator-dot online';
                     dot.title = `${s.short_name} доступен`;
                 }
             }
+            if (cardEl) {
+                cardEl.classList.remove('is-offline');
+            }
             if (countEl) {
                 countEl.textContent = `${s.online_count} / ${s.max_players}`;
             }
 
-            if (Array.isArray(s.players)) {
-                for (const p of s.players) {
-                    const name = typeof p === 'string' ? p : (p?.name_clean || p?.name_raw || 'Игрок');
-                    const norm = name.toLowerCase();
-                    if (!seenPlayers.has(norm)) {
-                        seenPlayers.add(norm);
-                        allPlayers.push({ name, server: s.short_name });
+            // Отрисовка игроков конкретного сервера
+            if (playersListEl) {
+                playersListEl.innerHTML = '';
+                const rawPlayers = Array.isArray(s.players) ? s.players : [];
+                if (rawPlayers.length > 0) {
+                    const fragment = document.createDocumentFragment();
+                    for (const p of rawPlayers) {
+                        const name = typeof p === 'string' ? p : (p?.name_clean || p?.name_raw || 'Игрок');
+                        const item = document.createElement('div');
+                        item.className = 'live-player-item';
+                        item.title = `${name} (${s.short_name})`;
+
+                        const avatarWrap = document.createElement('div');
+                        avatarWrap.className = 'live-player-avatar-wrap';
+
+                        const canvas = document.createElement('canvas');
+                        canvas.className = 'live-player-head-canvas';
+                        canvas.width = 32;
+                        canvas.height = 32;
+                        avatarWrap.appendChild(canvas);
+
+                        const nameSpan = document.createElement('span');
+                        nameSpan.className = 'live-player-name';
+                        nameSpan.textContent = name;
+
+                        item.appendChild(avatarWrap);
+                        item.appendChild(nameSpan);
+                        fragment.appendChild(item);
+
+                        // Рендерим кубическую голову
+                        renderPlayerHead(canvas, name);
                     }
+                    playersListEl.appendChild(fragment);
+                } else {
+                    playersListEl.innerHTML = '<div class="server-empty-hint">Сейчас никого нет на сервере</div>';
                 }
             }
         } else {
-            if (rowEl) {
-                rowEl.classList.add('is-offline');
-                const dot = rowEl.querySelector('.status-indicator-dot');
+            if (headerEl) {
+                headerEl.classList.add('is-offline');
+                const dot = headerEl.querySelector('.status-indicator-dot');
                 if (dot) {
                     dot.className = 'status-indicator-dot offline';
                     dot.title = `${s.short_name} оффлайн`;
                 }
             }
+            if (cardEl) {
+                cardEl.classList.add('is-offline');
+            }
             if (countEl) {
                 countEl.textContent = 'ОФФЛАЙН';
+            }
+            if (playersListEl) {
+                playersListEl.innerHTML = '<div class="server-empty-hint">Сервер оффлайн</div>';
             }
         }
     }
@@ -373,47 +515,6 @@ function renderServersStatus(serversMap) {
     }
     if (bottomCount) {
         bottomCount.textContent = anyOnline ? `В сети (${totalOnline} игроков)` : 'Оффлайн';
-    }
-
-    if (allPlayers.length > 0) {
-        if (liveCard) {
-            liveCard.classList.add('has-players');
-            liveCard.classList.remove('empty-card');
-        }
-        if (mainLayout) {
-            mainLayout.classList.add('has-players');
-            mainLayout.classList.remove('empty-card');
-        }
-        if (livePlayersContainer) {
-            livePlayersContainer.innerHTML = allPlayers.map(p => {
-                const avatarUrl = `${API_BASE}/skins/${encodeURIComponent(p.name)}.png`;
-                return `
-                    <div class="live-player-item" title="${p.name} (${p.server})">
-                        <div class="live-player-avatar-wrap">
-                            <img src="${avatarUrl}" class="live-player-avatar" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22%2339ff14%22><rect width=%2224%22 height=%2224%22 rx=%224%22 fill=%22%23111%22/><circle cx=%2212%22 cy=%229%22 r=%224%22 fill=%22%2339ff14%22/><path d=%22M4 20c0-4 4-6 8-6s8 2 8 6%22 fill=%22%2339ff14%22/></svg>'">
-                        </div>
-                        <span class="live-player-name">${p.name}</span>
-                    </div>
-                `;
-            }).join('');
-        }
-        attachTooltip(playerCount, allPlayers.map(p => `${p.name} [${p.server}]`));
-        attachTooltip(indicator, allPlayers.map(p => `${p.name} [${p.server}]`));
-        if (bottomCount) attachTooltip(bottomCount, allPlayers.map(p => `${p.name} [${p.server}]`));
-    } else {
-        if (liveCard) {
-            liveCard.classList.remove('has-players');
-            liveCard.classList.add('empty-card');
-        }
-        if (mainLayout) {
-            mainLayout.classList.remove('has-players');
-            mainLayout.classList.remove('empty-card');
-        }
-        if (livePlayersContainer) {
-            livePlayersContainer.innerHTML = '';
-        }
-        const tooltip = document.getElementById('players-tooltip');
-        if (tooltip) tooltip.remove();
     }
 }
 
@@ -437,6 +538,7 @@ export async function updateServerStatus() {
  * Запустить периодическую проверку статуса
  */
 export function startStatusChecker() {
+    initServerSpoilers();
     updateServerStatus();
     if (!statusInterval) {
         statusInterval = setInterval(updateServerStatus, STATUS_UPDATE_INTERVAL);

@@ -365,10 +365,10 @@ export const MOD_GROUPS = [
         "curseSlug": "jade",
         "modrinthSlug": "jade",
         "files": [
-            "jade-mc26.3",
             "jade-mc26.1",
-            "jademc26.1",
+            "jade-mc26.3",
             "jademc26.3",
+            "jademc26.1",
             "jade"
         ],
         "side": "client-optional"
@@ -1424,8 +1424,8 @@ export const MOD_GROUPS = [
         "curseSlug": "litematica-printer",
         "modrinthSlug": "litematica-printer",
         "files": [
-            "litematica_printer",
             "litematica-printer",
+            "litematica_printer",
             "litematicaprinter"
         ],
         "side": "client-only",
