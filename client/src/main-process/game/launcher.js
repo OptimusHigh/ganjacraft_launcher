@@ -21,6 +21,7 @@ const {
     MANIFEST_URL,
     getNeoForgeInstallerUrl,
     NEOFORGE_INSTALLER_URL,
+    AUTHLIB_INJECTOR_VERSION,
     AUTHLIB_INJECTOR_URL,
     YGGDRASIL_AUTH_URL,
     BASE_URL,
@@ -280,8 +281,28 @@ function createLoggers(event, rootPath, config) {
 
     logStream.write(`--- Log started at ${new Date().toISOString()} ---\n`);
 
+    let msgCountInWindow = 0;
+    let windowStart = Date.now();
+    let throttledWarningLogged = false;
+
     const sendLog = (msg) => {
-        safeSenderSend(event.sender, 'log-message', msg);
+        const now = Date.now();
+        if (now - windowStart > 1000) {
+            windowStart = now;
+            msgCountInWindow = 0;
+            throttledWarningLogged = false;
+        }
+        msgCountInWindow++;
+
+        // Send to renderer IPC at most 100 messages/sec to prevent freezing Electron UI
+        if (msgCountInWindow <= 100) {
+            safeSenderSend(event.sender, 'log-message', msg);
+        } else if (!throttledWarningLogged) {
+            safeSenderSend(event.sender, 'log-message', '[LAUNCHER] High volume log output: throttling UI updates...');
+            throttledWarningLogged = true;
+        }
+
+        // Always write full log to file stream
         const timestamp = new Date().toISOString();
         if (logStream && !logStream.destroyed) {
             logStream.write(`[${timestamp}] ${msg}\n`);
@@ -562,8 +583,23 @@ async function prepareAuthlib(rootPath, sendLog, sendDebug, options = {}) {
     if (signal && signal.aborted) throw new Error('CANCELLED');
 
     const authlibPath = path.join(rootPath, 'authlib-injector.jar');
+    const versionMarkerPath = path.join(rootPath, 'authlib-injector.version');
 
-    if (!fs.existsSync(authlibPath) || !(await isZipIntact(authlibPath))) {
+    let needsDownload = !fs.existsSync(authlibPath) || !(await isZipIntact(authlibPath));
+    if (!needsDownload) {
+        let installedVersion = '';
+        try {
+            if (fs.existsSync(versionMarkerPath)) {
+                installedVersion = fs.readFileSync(versionMarkerPath, 'utf8').trim();
+            }
+        } catch {}
+        if (installedVersion !== AUTHLIB_INJECTOR_VERSION) {
+            sendDebug(`Authlib Injector outdated or unmarked (installed: "${installedVersion}", target: "${AUTHLIB_INJECTOR_VERSION}"), updating...`);
+            needsDownload = true;
+        }
+    }
+
+    if (needsDownload) {
         sendLog('Скачивание Authlib Injector...');
         sendDebug(`Downloading Authlib from ${AUTHLIB_INJECTOR_URL}`);
         await downloadFile(AUTHLIB_INJECTOR_URL, authlibPath, { timeoutMs: 60_000, signal });
@@ -572,6 +608,9 @@ async function prepareAuthlib(rootPath, sendLog, sendDebug, options = {}) {
             try { fs.unlinkSync(authlibPath); } catch { }
             throw new Error('Downloaded authlib-injector is not a valid JAR/ZIP');
         }
+        try {
+            fs.writeFileSync(versionMarkerPath, AUTHLIB_INJECTOR_VERSION, 'utf8');
+        } catch {}
         sendLog('Authlib Injector скачан.');
     }
 
@@ -645,6 +684,30 @@ function ensureRequiredResourcePacks(rootPath, sendLog, sendDebug) {
     } catch (e) {
         sendDebug(`ensureRequiredResourcePacks error: ${e.message}`);
         sendLog('Предупреждение: не удалось обновить options.txt с обязательными ресурспаками.');
+    }
+
+    sanitizeGameOptions(rootPath, sendDebug);
+}
+
+/**
+ * Исправление небезопасных настроек видео, приводящих к сбою видеодрайвера (0xC0000005)
+ */
+function sanitizeGameOptions(rootPath, sendDebug) {
+    const optionsPath = path.join(rootPath, 'options.txt');
+    if (!fs.existsSync(optionsPath)) return;
+    try {
+        let content = fs.readFileSync(optionsPath, 'utf-8');
+        let changed = false;
+        if (process.platform === 'win32' && content.includes('exclusiveFullscreen:true')) {
+            content = content.replace(/exclusiveFullscreen:true/g, 'exclusiveFullscreen:false');
+            changed = true;
+            if (sendDebug) sendDebug('Sanitized options.txt: set exclusiveFullscreen to false to prevent GPU driver crash');
+        }
+        if (changed) {
+            fs.writeFileSync(optionsPath, content, 'utf-8');
+        }
+    } catch (e) {
+        if (sendDebug) sendDebug(`Failed to sanitize options.txt: ${e.message}`);
     }
 }
 
@@ -783,6 +846,17 @@ async function ensureFabricVersionJson(rootPath, sendLog, sendDebug, options = {
     // Объединяем библиотеки: Fabric в начало (для приоритета класспаса), затем Vanilla
     const existingNames = new Set((rawFabricJson.libraries || []).map(l => l.name));
     merged.libraries = [...(rawFabricJson.libraries || [])];
+
+    // Добавляем Intermediary mappings для Fabric
+    const intermediaryName = `net.fabricmc:intermediary:${minecraftVersion}`;
+    if (!existingNames.has(intermediaryName)) {
+        merged.libraries.unshift({
+            name: intermediaryName,
+            url: 'https://maven.fabricmc.net/'
+        });
+        existingNames.add(intermediaryName);
+    }
+
     if (Array.isArray(vanillaJson.libraries)) {
         for (const lib of vanillaJson.libraries) {
             if (!existingNames.has(lib.name)) {
@@ -818,6 +892,70 @@ async function ensureFabricVersionJson(rootPath, sendLog, sendDebug, options = {
 
     if (sendDebug) sendDebug(`Fabric version JSON merged successfully (${merged.libraries.length} libs).`);
     return { versionId, versionJsonPath, versionJson: merged };
+}
+
+/**
+ * Верифицировать и автоматически восстановить необходимые библиотеки Fabric
+ */
+async function verifyFabricLibraries(rootPath, minecraftVersion, loaderVersion, sendLog, sendDebug, options = {}) {
+    const signal = options.signal;
+    const librariesDir = path.join(rootPath, 'libraries');
+
+    // 1. Intermediary mappings: абсолютно обязательны для работы Fabric Loader
+    const intermediaryRelPath = path.join('net', 'fabricmc', 'intermediary', minecraftVersion, `intermediary-${minecraftVersion}.jar`);
+    const intermediaryFullPath = path.join(librariesDir, intermediaryRelPath);
+
+    let needDownloadIntermediary = !fs.existsSync(intermediaryFullPath);
+    if (!needDownloadIntermediary) {
+        const intact = await isZipIntact(intermediaryFullPath);
+        if (!intact) {
+            sendDebug(`Corrupted intermediary JAR at ${intermediaryFullPath}, re-downloading...`);
+            try { fs.unlinkSync(intermediaryFullPath); } catch {}
+            needDownloadIntermediary = true;
+        }
+    }
+
+    if (needDownloadIntermediary) {
+        sendLog(`[FABRIC] Скачивание Intermediary Mappings для Minecraft ${minecraftVersion}...`);
+        const url = `https://maven.fabricmc.net/net/fabricmc/intermediary/${encodeURIComponent(minecraftVersion)}/intermediary-${encodeURIComponent(minecraftVersion)}.jar`;
+        sendDebug(`Downloading intermediary from ${url}`);
+        fs.mkdirSync(path.dirname(intermediaryFullPath), { recursive: true });
+        await downloadFile(url, intermediaryFullPath, { signal, timeoutMs: 30_000 });
+        if (!(await isZipIntact(intermediaryFullPath))) {
+            try { fs.unlinkSync(intermediaryFullPath); } catch {}
+            throw new Error(`Не удалось скачать корректный intermediary-${minecraftVersion}.jar`);
+        }
+        sendLog(`[FABRIC] Intermediary Mappings ${minecraftVersion} успешно установлены.`);
+    }
+
+    // 2. Проверка библиотек Fabric Loader и Sponge Mixin
+    const versionId = `fabric-loader-${loaderVersion}-${minecraftVersion}`;
+    const versionJsonPath = path.join(rootPath, 'versions', versionId, `${versionId}.json`);
+    let deletedCount = 0;
+    if (fs.existsSync(versionJsonPath)) {
+        try {
+            const verJson = JSON.parse(fs.readFileSync(versionJsonPath, 'utf8'));
+            const fabricLibs = (verJson.libraries || []).filter(l => l.url && (l.url.includes('fabricmc') || l.name?.startsWith('net.fabricmc') || l.name?.startsWith('org.ow2.asm')));
+            for (const lib of fabricLibs) {
+                const parts = lib.name.split(':');
+                if (parts.length < 3) continue;
+                const [group, artifact, version, classifier] = parts;
+                const filename = classifier ? `${artifact}-${version}-${classifier}.jar` : `${artifact}-${version}.jar`;
+                const filePath = path.join(librariesDir, ...group.split('.'), artifact, version, filename);
+
+                if (fs.existsSync(filePath)) {
+                    const intact = await isZipIntact(filePath);
+                    if (!intact) {
+                        sendDebug(`[FABRIC] Corrupted library detected: ${filePath}, deleting for re-download...`);
+                        try { fs.unlinkSync(filePath); deletedCount++; } catch {}
+                    }
+                }
+            }
+        } catch (e) {
+            sendDebug(`[FABRIC] Library verification error: ${e.message}`);
+        }
+    }
+    return deletedCount;
 }
 
 function buildLaunchOptions(config, rootPath, javaPath, forgeInstallerPath, authlibPath, authSession, authlibPrefetched, profile) {
@@ -1175,7 +1313,7 @@ async function launchGame(event, options) {
             }
         }
 
-        // Prepare Fabric version metadata; libraries are resolved and downloaded by MCLC.
+        // Prepare Fabric version metadata and verify libraries
         if (profile.loader === 'fabric') {
             try {
                 await ensureFabricVersionJson(rootPath, sendLog, sendDebug, {
@@ -1183,6 +1321,7 @@ async function launchGame(event, options) {
                     minecraftVersion: profile.minecraftVersion,
                     fabricLoaderVersion: profile.fabricLoaderVersion,
                 });
+                await verifyFabricLibraries(rootPath, profile.minecraftVersion, profile.fabricLoaderVersion, sendLog, sendDebug, { signal });
             } catch (e) {
                 if (e.message === 'CANCELLED' || isLaunchCancelled || signal.aborted) {
                     isGameRunning = false;
@@ -1265,13 +1404,16 @@ async function launchGame(event, options) {
             });
         }
 
-        // Verify NeoForge library SHA1 hashes (delete corrupted, MCLC will re-download)
+        // Verify library SHA1 hashes and integrity (delete corrupted, MCLC will re-download)
         try {
-            const corrupted = profile.loader === 'neoforge'
-                ? await verifyNeoForgeLibraries(rootPath, sendLog, sendDebug, {
+            let corrupted = 0;
+            if (profile.loader === 'neoforge') {
+                corrupted = await verifyNeoForgeLibraries(rootPath, sendLog, sendDebug, {
                     neoforgeVersion: profile.neoforgeVersion,
-                })
-                : 0;
+                });
+            } else if (profile.loader === 'fabric') {
+                corrupted = await verifyFabricLibraries(rootPath, profile.minecraftVersion, profile.fabricLoaderVersion, sendLog, sendDebug, { signal });
+            }
             if (corrupted > 0) {
                 sendDebug(`Deleted ${corrupted} corrupted libraries. MCLC will re-download them.`);
             }
@@ -1563,5 +1705,7 @@ module.exports = {
     cancelLaunch,
     getIsGameRunning,
     ensureFabricVersionJson,
+    verifyFabricLibraries,
+    sanitizeGameOptions,
     buildLaunchOptions,
 };

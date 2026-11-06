@@ -79,7 +79,8 @@ const NEOFORGE_INSTALLER_URL = `https://maven.neoforged.net/releases/net/neoforg
 function getNeoForgeInstallerUrl(version = NEOFORGE_VERSION) {
     return `https://maven.neoforged.net/releases/net/neoforged/neoforge/${version}/neoforge-${version}-installer.jar`;
 }
-const AUTHLIB_INJECTOR_URL = `https://github.com/yushijinhun/authlib-injector/releases/download/v1.2.5/authlib-injector-1.2.5.jar`;
+const AUTHLIB_INJECTOR_VERSION = '1.2.8';
+const AUTHLIB_INJECTOR_URL = `https://github.com/yushijinhun/authlib-injector/releases/download/v${AUTHLIB_INJECTOR_VERSION}/authlib-injector-${AUTHLIB_INJECTOR_VERSION}.jar`;
 const YGGDRASIL_AUTH_URL = `${API_BASE}/yggdrasil/authserver/authenticate`;
 
 const VANILLA_VERSION_JSON_URL = `https://piston-meta.mojang.com/v1/packages/67e466e82c012158c8cda81df39aa40a7ade7276/1.21.1.json`;
@@ -165,6 +166,7 @@ const DEFAULT_DISABLED_OPTIONAL_MOD_PATTERNS = [
 
 // JVM optimization arguments
 const JVM_OPTIMIZATION_ARGS = [
+    '-Xss4m',
     '-Dneoforge.readTimeout=600',
     '-Dforge.readTimeout=600',
     '-Dfml.readTimeout=600',
@@ -210,6 +212,7 @@ module.exports = {
     MANIFEST_HISTORY_URL,
     getNeoForgeInstallerUrl,
     NEOFORGE_INSTALLER_URL,
+    AUTHLIB_INJECTOR_VERSION,
     AUTHLIB_INJECTOR_URL,
     YGGDRASIL_AUTH_URL,
     VANILLA_VERSION_JSON_URL,
