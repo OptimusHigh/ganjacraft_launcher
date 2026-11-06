@@ -705,13 +705,22 @@
                     <!-- Server presence remains available without competing with launch controls -->
                     <div class="launch-action-hub">
                         <div class="server-live-card-modern empty-card">
-                            <!-- Top: Live status dot + player count -->
-                            <div class="server-live-top-row">
-                                <div class="server-live-status-pill">
-                                    <span class="status-indicator-dot online"></span>
-                                    <span class="server-live-status-text" id="live-status-text">СЕРВЕР В СЕТИ</span>
+                            <!-- Multi-server live status list -->
+                            <div class="servers-status-list" id="servers-status-list">
+                                <div class="server-status-item" id="server-status-vanilla" data-server="vanilla">
+                                    <div class="server-status-header">
+                                        <span class="status-indicator-dot online"></span>
+                                        <span class="server-status-title">VANILLA:</span>
+                                    </div>
+                                    <span class="server-status-count" id="count-vanilla">0 / 20</span>
                                 </div>
-                                <div class="server-live-count-large" id="live-player-count">0 / 1337</div>
+                                <div class="server-status-item" id="server-status-ganj4craft5" data-server="ganj4craft5">
+                                    <div class="server-status-header">
+                                        <span class="status-indicator-dot online"></span>
+                                        <span class="server-status-title">THAUMPARTY:</span>
+                                    </div>
+                                    <span class="server-status-count" id="count-ganj4craft5">0 / 20</span>
+                                </div>
                             </div>
 
                             <!-- Clean divider (visible when players online) -->

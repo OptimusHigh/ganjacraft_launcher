@@ -585,7 +585,7 @@ body.is-game-launching .launch-action-hub,
     top: 24px;
     right: 28px;
     width: auto;
-    max-width: 190px;
+    max-width: 260px;
     height: auto;
     display: flex;
     flex-direction: column;
@@ -594,7 +594,7 @@ body.is-game-launching .launch-action-hub,
     box-sizing: border-box;
     z-index: 15;
     padding: 2px 0 4px 0;
-    transform: scale(0.82);
+    transform: scale(0.9);
     transform-origin: top right;
     pointer-events: none;
 }
@@ -630,23 +630,66 @@ body.is-game-launching .launch-action-hub,
     height: auto !important;
 }
 
-.server-live-top-row {
+/* ── Multi-server status display ── */
+.servers-status-list {
     display: flex;
     flex-direction: column;
+    gap: 4px;
     align-items: flex-end;
-    gap: 3px;
     width: 100%;
-    padding: 4px 0;
+    padding: 2px 0;
 }
 
-.server-live-status-pill {
+.server-status-item {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+    width: 100%;
+}
+
+.server-status-header {
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    background: transparent !important;
-    border: none !important;
-    box-shadow: none !important;
-    padding: 0 !important;
+}
+
+.server-status-title {
+    font-family: var(--gc-font-display);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1.4px;
+    color: var(--gc-text-muted);
+    text-transform: uppercase;
+    transition: color 0.2s ease;
+}
+
+.server-status-count {
+    font-family: var(--gc-font-display);
+    font-size: 18px;
+    font-weight: 800;
+    color: var(--gc-text-white);
+    letter-spacing: 0.5px;
+    line-height: 1.1;
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+    min-width: 58px;
+    text-align: right;
+}
+
+.server-status-item.is-active .server-status-title {
+    color: #fff;
+    text-shadow: 0 0 10px rgba(57, 255, 20, 0.4);
+}
+
+.server-status-item.is-offline .server-status-title {
+    color: #666;
+}
+
+.server-status-item.is-offline .server-status-count {
+    color: #666;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.8px;
 }
 
 .status-indicator-dot {
@@ -667,45 +710,6 @@ body.is-game-launching .launch-action-hub,
     background-color: var(--gc-red);
     box-shadow: 0 0 8px var(--gc-red);
     animation: none;
-}
-
-.server-live-status-text {
-    font-family: var(--gc-font-display);
-    font-size: 10px;
-    font-weight: 700;
-    letter-spacing: 1.4px;
-    color: var(--gc-text-muted);
-    text-transform: uppercase;
-    line-height: 1;
-}
-
-.server-live-count-large {
-    font-family: var(--gc-font-display);
-    font-size: 22px;
-    font-weight: 800;
-    color: var(--gc-text-white);
-    letter-spacing: 0.5px;
-    line-height: 1.1;
-    background: transparent !important;
-    border: none !important;
-    box-shadow: none !important;
-    padding: 0 !important;
-    margin: 0 !important;
-    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
-}
-
-.server-live-card-modern:not(.has-players) .server-live-count-large,
-.server-live-card-modern.empty-card .server-live-count-large {
-    font-size: 22px !important;
-    font-weight: 800 !important;
-    color: var(--gc-text-white) !important;
-    background: transparent !important;
-    border: none !important;
-    padding: 0 !important;
-    border-radius: 0 !important;
-    margin: 0 !important;
-    letter-spacing: 0.5px !important;
-    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6) !important;
 }
 
 .server-live-card-modern:not(.has-players) .server-card-divider,

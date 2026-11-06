@@ -20,6 +20,7 @@ export function setServerProfile(profile) {
         serverHost: profile.serverHost || DEFAULT_SERVER_HOST,
         serverPort: Number(profile.serverPort) || 25565,
     } : null;
+    updateActiveServerHighlight();
 }
 
 export async function initBuildProfileSelector(config = {}) {
@@ -221,161 +222,214 @@ async function fetchServerStatus(profile) {
     return result;
 }
 
-export async function updateServerStatus() {
+function updateActiveServerHighlight() {
+    const currentId = activeProfile?.id || window.__activeBuildProfileId;
+    ['vanilla', 'ganj4craft5'].forEach(sid => {
+        const el = document.getElementById(`server-status-${sid}`);
+        if (el) {
+            el.classList.toggle('is-active', sid === currentId);
+        }
+    });
+}
+
+if (typeof window !== 'undefined') {
+    window.addEventListener('build-profile-changed', () => updateActiveServerHighlight());
+}
+
+/**
+ * Прямой запрос статуса серверов через API бота (без сторонних сервисов)
+ */
+async function fetchServersFromApi() {
+    try {
+        const response = await fetch(`${API_BASE}/status/servers`, {
+            headers: {
+                'Cache-Control': 'no-cache',
+                'User-Agent': 'localtunnel',
+                'Bypass-Tunnel-Reminder': 'true'
+            }
+        });
+        if (response.ok) {
+            const data = await response.json();
+            if (data.success && data.servers) {
+                return data.servers;
+            }
+        }
+    } catch (e) {
+        console.warn('[Status] Direct API fetch failed, falling back:', e);
+    }
+    return null;
+}
+
+/**
+ * Фолбэк опрос через внешние публичные сервисы (если бэкенд недоступен)
+ */
+async function fetchFallbackStatuses() {
+    if (!availableProfiles.length) return null;
+    const statuses = await Promise.all(availableProfiles.map(fetchServerStatus));
+    const result = {};
+    for (const s of statuses) {
+        const pid = s.profile.id;
+        result[pid] = {
+            id: pid,
+            name: s.profile.name || pid,
+            short_name: (s.profile.shortName || pid).toUpperCase(),
+            online: s.online,
+            online_count: s.onlineCount,
+            max_players: s.maxCount || 20,
+            players: s.list || []
+        };
+    }
+    return result;
+}
+
+/**
+ * Отрисовка статуса серверов (VANILLA и THAUMPARTY)
+ */
+function renderServersStatus(serversMap) {
+    if (!serversMap) return;
+
     const playerCount = dom.get('player-count');
     const indicator = document.querySelector('.status-indicator');
-    if (!playerCount || !indicator) return;
-    if (!availableProfiles.length) {
-        playerCount.textContent = 'Выберите сборку';
-        indicator.className = 'status-indicator';
-        indicator.title = 'Игровая сборка не выбрана';
-        const liveStatusText = dom.get('live-status-text');
-        if (liveStatusText) liveStatusText.textContent = 'ВЫБЕРИТЕ СБОРКУ';
-        return;
+    const liveCard = document.querySelector('.server-live-card-modern');
+    const mainLayout = document.querySelector('.main-dashboard-layout');
+    const livePlayersContainer = dom.get('live-players-container');
+    const bottomCount = dom.get('bottom-player-count');
+
+    let totalOnline = 0;
+    let totalMax = 0;
+    let anyOnline = false;
+    const allPlayers = [];
+    const seenPlayers = new Set();
+
+    const serverKeys = ['vanilla', 'ganj4craft5'];
+    for (const key of serverKeys) {
+        const s = serversMap[key] || {
+            id: key,
+            short_name: key === 'vanilla' ? 'VANILLA' : 'THAUMPARTY',
+            online: false,
+            online_count: 0,
+            max_players: 20,
+            players: []
+        };
+
+        const rowEl = document.getElementById(`server-status-${key}`);
+        const countEl = document.getElementById(`count-${key}`);
+
+        if (s.online) {
+            anyOnline = true;
+            totalOnline += s.online_count;
+            totalMax += s.max_players;
+
+            if (rowEl) {
+                rowEl.classList.remove('is-offline');
+                const dot = rowEl.querySelector('.status-indicator-dot');
+                if (dot) {
+                    dot.className = 'status-indicator-dot online';
+                    dot.title = `${s.short_name} доступен`;
+                }
+            }
+            if (countEl) {
+                countEl.textContent = `${s.online_count} / ${s.max_players}`;
+            }
+
+            if (Array.isArray(s.players)) {
+                for (const p of s.players) {
+                    const name = typeof p === 'string' ? p : (p?.name_clean || p?.name_raw || 'Игрок');
+                    const norm = name.toLowerCase();
+                    if (!seenPlayers.has(norm)) {
+                        seenPlayers.add(norm);
+                        allPlayers.push({ name, server: s.short_name });
+                    }
+                }
+            }
+        } else {
+            if (rowEl) {
+                rowEl.classList.add('is-offline');
+                const dot = rowEl.querySelector('.status-indicator-dot');
+                if (dot) {
+                    dot.className = 'status-indicator-dot offline';
+                    dot.title = `${s.short_name} оффлайн`;
+                }
+            }
+            if (countEl) {
+                countEl.textContent = 'ОФФЛАЙН';
+            }
+        }
     }
 
-    try {
-        const statuses = await Promise.all(availableProfiles.map(fetchServerStatus));
-        const onlineStatuses = statuses.filter(status => status.online);
-        const isOnline = onlineStatuses.length > 0;
-        const onlineCount = onlineStatuses.reduce((sum, status) => sum + status.onlineCount, 0);
-        const maxCount = onlineStatuses.reduce((sum, status) => sum + status.maxCount, 0);
-        const seenPlayers = new Set();
-        const list = onlineStatuses.flatMap(status => status.list).filter(player => {
-            const name = typeof player === 'string'
-                ? player
-                : (player?.name_clean || player?.name_raw || 'Игрок');
-            const key = name.toLocaleLowerCase();
-            if (seenPlayers.has(key)) return false;
-            seenPlayers.add(key);
-            return true;
-        });
-        const onlineServerNames = onlineStatuses.map(status => status.profile.shortName || status.profile.name).join(' + ');
+    updateActiveServerHighlight();
 
-        const liveCard = document.querySelector('.server-live-card-modern');
-        const bottomCount = dom.get('bottom-player-count');
-        const liveStatusText = dom.get('live-status-text');
-        const livePlayerCount = dom.get('live-player-count');
-        const livePlayersContainer = dom.get('live-players-container');
-
-        if (isOnline) {
-            playerCount.textContent = `${onlineCount} / ${maxCount} онлайн`;
+    if (playerCount) {
+        if (anyOnline) {
+            playerCount.textContent = `${totalOnline} / ${totalMax} онлайн`;
             playerCount.style.cursor = 'default';
-
-            if (bottomCount) {
-                bottomCount.textContent = `В сети (${onlineCount} игроков)`;
-            }
-
-            indicator.className = 'status-indicator online';
-            indicator.title = 'Сервер доступен';
-
-            const liveDot = document.querySelector('.status-indicator-dot');
-            if (liveDot) {
-                liveDot.className = 'status-indicator-dot online';
-                liveDot.title = 'Сервер доступен';
-            }
-
-            if (liveStatusText) {
-                liveStatusText.textContent = `СЕРВЕРЫ В СЕТИ · ${onlineServerNames || 'нет данных'}`;
-            }
-            if (livePlayerCount) {
-                livePlayerCount.textContent = `${onlineCount} / ${maxCount}`;
-            }
-
-            const mainLayout = document.querySelector('.main-dashboard-layout');
-            if (Array.isArray(list) && list.length > 0) {
-                if (liveCard) {
-                    liveCard.classList.add('has-players');
-                    liveCard.classList.remove('empty-card');
-                }
-                if (mainLayout) {
-                    mainLayout.classList.add('has-players');
-                    mainLayout.classList.remove('empty-card');
-                }
-                if (livePlayersContainer) {
-                    livePlayersContainer.innerHTML = list.map(p => {
-                        const name = typeof p === 'string' ? p : (p?.name_clean || p?.name_raw || 'Игрок');
-                        const avatarUrl = `${API_BASE}/skins/${encodeURIComponent(name)}.png`;
-                        return `
-                            <div class="live-player-item" title="${name}">
-                                <div class="live-player-avatar-wrap">
-                                    <img src="${avatarUrl}" class="live-player-avatar" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22%2339ff14%22><rect width=%2224%22 height=%2224%22 rx=%224%22 fill=%22%23111%22/><circle cx=%2212%22 cy=%229%22 r=%224%22 fill=%22%2339ff14%22/><path d=%22M4 20c0-4 4-6 8-6s8 2 8 6%22 fill=%22%2339ff14%22/></svg>'">
-                                </div>
-                                <span class="live-player-name">${name}</span>
-                            </div>
-                        `;
-                    }).join('');
-                }
-            } else {
-                // Нет игроков в онлайне — минималистичный режим без фона и заглушек
-                if (liveCard) {
-                    liveCard.classList.remove('has-players');
-                    liveCard.classList.add('empty-card');
-                }
-                if (mainLayout) {
-                    mainLayout.classList.remove('has-players');
-                    mainLayout.classList.add('empty-card');
-                }
-                if (livePlayersContainer) {
-                    livePlayersContainer.innerHTML = '';
-                }
-            }
-
-            // Тултип с никами при наведении
-            attachTooltip(playerCount, list);
-            attachTooltip(indicator, list);
-            if (bottomCount) attachTooltip(bottomCount, list);
         } else {
             playerCount.textContent = 'Оффлайн';
-            playerCount.style.cursor = 'default';
-            if (bottomCount) {
-                bottomCount.textContent = 'Оффлайн';
-            }
-            indicator.className = 'status-indicator offline';
-            indicator.title = 'Сервер недоступен';
+        }
+    }
+    if (indicator) {
+        indicator.className = anyOnline ? 'status-indicator online' : 'status-indicator offline';
+        indicator.title = anyOnline ? 'Серверы доступны' : 'Серверы недоступны';
+    }
+    if (bottomCount) {
+        bottomCount.textContent = anyOnline ? `В сети (${totalOnline} игроков)` : 'Оффлайн';
+    }
 
-            const liveDot = document.querySelector('.status-indicator-dot');
-            if (liveDot) {
-                liveDot.className = 'status-indicator-dot offline';
-                liveDot.title = 'Сервер недоступен';
-            }
+    if (allPlayers.length > 0) {
+        if (liveCard) {
+            liveCard.classList.add('has-players');
+            liveCard.classList.remove('empty-card');
+        }
+        if (mainLayout) {
+            mainLayout.classList.add('has-players');
+            mainLayout.classList.remove('empty-card');
+        }
+        if (livePlayersContainer) {
+            livePlayersContainer.innerHTML = allPlayers.map(p => {
+                const avatarUrl = `${API_BASE}/skins/${encodeURIComponent(p.name)}.png`;
+                return `
+                    <div class="live-player-item" title="${p.name} (${p.server})">
+                        <div class="live-player-avatar-wrap">
+                            <img src="${avatarUrl}" class="live-player-avatar" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22%2339ff14%22><rect width=%2224%22 height=%2224%22 rx=%224%22 fill=%22%23111%22/><circle cx=%2212%22 cy=%229%22 r=%224%22 fill=%22%2339ff14%22/><path d=%22M4 20c0-4 4-6 8-6s8 2 8 6%22 fill=%22%2339ff14%22/></svg>'">
+                        </div>
+                        <span class="live-player-name">${p.name}</span>
+                    </div>
+                `;
+            }).join('');
+        }
+        attachTooltip(playerCount, allPlayers.map(p => `${p.name} [${p.server}]`));
+        attachTooltip(indicator, allPlayers.map(p => `${p.name} [${p.server}]`));
+        if (bottomCount) attachTooltip(bottomCount, allPlayers.map(p => `${p.name} [${p.server}]`));
+    } else {
+        if (liveCard) {
+            liveCard.classList.remove('has-players');
+            liveCard.classList.add('empty-card');
+        }
+        if (mainLayout) {
+            mainLayout.classList.remove('has-players');
+            mainLayout.classList.remove('empty-card');
+        }
+        if (livePlayersContainer) {
+            livePlayersContainer.innerHTML = '';
+        }
+        const tooltip = document.getElementById('players-tooltip');
+        if (tooltip) tooltip.remove();
+    }
+}
 
-            const mainLayout = document.querySelector('.main-dashboard-layout');
-            if (liveCard) {
-                liveCard.classList.remove('has-players');
-                liveCard.classList.add('empty-card');
-            }
-            if (mainLayout) {
-                mainLayout.classList.remove('has-players');
-                mainLayout.classList.add('empty-card');
-            }
-            if (liveStatusText) {
-                liveStatusText.textContent = 'СЕРВЕРЫ ОФФЛАЙН';
-            }
-            if (livePlayerCount) {
-                livePlayerCount.textContent = '0 / 0';
-            }
-            if (livePlayersContainer) {
-                livePlayersContainer.innerHTML = '';
-            }
+export async function updateServerStatus() {
+    try {
+        let serversData = await fetchServersFromApi();
 
-            // Убираем тултип если есть
-            const tooltip = document.getElementById('players-tooltip');
-            if (tooltip) tooltip.remove();
+        if (!serversData) {
+            serversData = await fetchFallbackStatuses();
+        }
+
+        if (serversData) {
+            renderServersStatus(serversData);
         }
     } catch (error) {
-        console.error('Status check failed:', error);
-        playerCount.textContent = '—';
-        indicator.className = 'status-indicator offline';
-        const livePlayersContainer = dom.get('live-players-container');
-        if (livePlayersContainer) {
-            livePlayersContainer.innerHTML = `
-                <div class="live-empty-state offline">
-                    <span class="live-empty-icon">⚠️</span>
-                    <span>Ошибка связи с сервером</span>
-                </div>
-            `;
-        }
+        console.error('[Status] Server status update failed:', error);
     }
 }
 

@@ -105,22 +105,6 @@ export const MOD_GROUPS = [
         "side": "client-only"
     },
     {
-        "id": "leavesbegone",
-        "name": "Leaves Be Gone",
-        "shortName": "Leaves Be Gone",
-        "version": "26.1.0",
-        "category": "Графика",
-        "subCategory": "Графика",
-        "icon": "brush",
-        "description": "Quick leaf decay from cutting down trees. Built for great performance and mod compat!",
-        "curseSlug": "leaves-be-gone",
-        "modrinthSlug": "leaves-be-gone",
-        "files": [
-            "leavesbegone"
-        ],
-        "side": "client-only"
-    },
-    {
         "id": "notenoughanimations",
         "name": "NotEnoughAnimations",
         "shortName": "NotEnoughAnimations",
@@ -381,10 +365,10 @@ export const MOD_GROUPS = [
         "curseSlug": "jade",
         "modrinthSlug": "jade",
         "files": [
-            "jade-mc26.1",
             "jade-mc26.3",
-            "jademc26.3",
+            "jade-mc26.1",
             "jademc26.1",
+            "jademc26.3",
             "jade"
         ],
         "side": "client-optional"
@@ -653,54 +637,6 @@ export const MOD_GROUPS = [
         "side": "client-only"
     },
     {
-        "id": "async",
-        "name": "Async",
-        "shortName": "Async",
-        "version": "0.2.5+alpha-26.1.2",
-        "category": "Оптимизация",
-        "subCategory": "Оптимизация",
-        "icon": "gear",
-        "description": "Async-Minecraft Entity Multi-Threading Mod",
-        "curseSlug": "async",
-        "modrinthSlug": "async",
-        "files": [
-            "async"
-        ],
-        "side": "client-optional"
-    },
-    {
-        "id": "asynclogger",
-        "name": "Async Logger",
-        "shortName": "Async Logger",
-        "version": "2.2.3+26.1.2-neoforge",
-        "category": "Оптимизация",
-        "subCategory": "Оптимизация",
-        "icon": "gear",
-        "description": "Asynchronous logging and efficient filtering - performance improvements and utility for keeping your logs clean",
-        "curseSlug": "async-logger",
-        "modrinthSlug": "async-logger",
-        "files": [
-            "asynclogger"
-        ],
-        "side": "client-optional"
-    },
-    {
-        "id": "asyncparticles",
-        "name": "AsyncParticles",
-        "shortName": "AsyncParticles",
-        "version": "26.1.2.8",
-        "category": "Оптимизация",
-        "subCategory": "Оптимизация",
-        "icon": "gear",
-        "description": "Мод AsyncParticles (client-only)",
-        "curseSlug": "asyncparticles",
-        "modrinthSlug": "asyncparticles",
-        "files": [
-            "asyncparticles"
-        ],
-        "side": "client-only"
-    },
-    {
         "id": "badoptimizations",
         "name": "BadOptimizations",
         "shortName": "BadOptimizations",
@@ -747,22 +683,6 @@ export const MOD_GROUPS = [
             "entityculling"
         ],
         "side": "client-only"
-    },
-    {
-        "id": "zfastnoise",
-        "name": "Fast Noise",
-        "shortName": "Fast Noise",
-        "version": "1.0.40",
-        "category": "Оптимизация",
-        "subCategory": "Оптимизация",
-        "icon": "gear",
-        "description": "Мод Fast Noise (client-optional)",
-        "curseSlug": "fast-noise",
-        "modrinthSlug": "fast-noise",
-        "files": [
-            "zfastnoise"
-        ],
-        "side": "client-optional"
     },
     {
         "id": "fasterblockentities",
@@ -845,22 +765,6 @@ export const MOD_GROUPS = [
         "side": "client-optional"
     },
     {
-        "id": "ksyxis",
-        "name": "Ksyxis",
-        "shortName": "Ksyxis",
-        "version": "1.4.6",
-        "category": "Оптимизация",
-        "subCategory": "Оптимизация",
-        "icon": "gear",
-        "description": "Speed up your world loading by removing unneeded chunks.",
-        "curseSlug": "ksyxis",
-        "modrinthSlug": "ksyxis",
-        "files": [
-            "ksyxis"
-        ],
-        "side": "client-optional"
-    },
-    {
         "id": "lithium",
         "name": "Lithium",
         "shortName": "Lithium",
@@ -923,22 +827,6 @@ export const MOD_GROUPS = [
             "sodium"
         ],
         "side": "client-only"
-    },
-    {
-        "id": "fastasyncworldsave",
-        "name": "fastasyncworldsave Mod",
-        "shortName": "fastasyncworldsave Mod",
-        "version": "26.3-2.6",
-        "category": "Оптимизация",
-        "subCategory": "Оптимизация",
-        "icon": "gear",
-        "description": "Мод fastasyncworldsave Mod (client-optional)",
-        "curseSlug": "fastasyncworldsave-mod",
-        "modrinthSlug": "fastasyncworldsave-mod",
-        "files": [
-            "fastasyncworldsave"
-        ],
-        "side": "client-optional"
     },
     {
         "id": "armory_reforged",
@@ -1362,8 +1250,8 @@ export const MOD_GROUPS = [
         "curseSlug": "reese-s-sodium-options",
         "modrinthSlug": "reese-s-sodium-options",
         "files": [
-            "reeses_sodium_options",
             "reeses-sodium-options",
+            "reeses_sodium_options",
             "reesessodiumoptions"
         ],
         "side": "client-only",

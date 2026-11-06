@@ -9,12 +9,14 @@ GanjaCraft Mod Classifier & Launcher Configurator
      - both: контентный мод (блоки, предметы, биомы, сущности — строго обязателен на клиенте и сервере)
      - server-only: серверный плагин/утилита (Chunky, LuckPerms, EasyAuth, StyledChat и т.д.)
   3. Вычисление графа реальных зависимостей (parents/addons/libraries).
-  4. Разделение модов на папки (client_mods, mods, server_mods).
+  4. Разделение клиентских модов (client_mods) и добавление серверного префикса server_ в mods/.
+     (Папка server_mods НЕ используется — серверные моды лежат в mods/ с префиксом server_ / server-,
+     чтобы сервер их загружал, а манифест лаунчера и sync_service их игнорировали).
   5. Генерация актуальной конфигурации mod-groups.js для лаунчера GanjaCraft.
 
 Использование:
   python tools/mod_classifier.py --scan <путь_к_папке_mods>
-  python tools/mod_classifier.py --separate <путь_к_папке> [--dry-run]
+  python tools/mod_classifier.py --separate <путь_к_папке_mods> [--dry-run]
   python tools/mod_classifier.py --update-launcher
 """
 from __future__ import annotations
@@ -40,8 +42,9 @@ KNOWN_SERVER_ONLY: Set[str] = {
     "essential_commands", "luckperms", "serverreplay", "ledger",
     "styled-chat", "styled_chat", "styled-nicknames", "styledplayerlist",
     "viperantixray", "meowantixray", "mtsanticheat", "floodgate", "geyser",
-    "servercore", "spark", "ftb-essentials", "invview", "slashloot",
-    "fabric-carpet", "packet_fixer"
+    "servercore", "spark", "ftb-essentials", "ftbessentials", "invview", "slashloot",
+    "fabric-carpet", "packet_fixer", "leavesbegone", "leaves-be-gone", "leaves_be_gone",
+    "zfastnoise", "fastnoise", "fast_noise", "ksyxis", "dungeoncrawl", "dungeon_crawl", "async"
 }
 
 KNOWN_CLIENT_ONLY: Set[str] = {
@@ -56,8 +59,7 @@ KNOWN_CLIENT_ONLY: Set[str] = {
     "betteradvancements", "shulkerboxtooltip", "advanced-xray", "xray",
     "reeses", "continuity", "variants-cit", "sound-physics", "sound_physics",
     "spawnanimations", "spawn-animations", "windy", "configsearch",
-    "clickthrough", "cutthrough", "better-advanced-tooltips", "asyncparticles",
-    "leavesbegone"
+    "clickthrough", "cutthrough", "better-advanced-tooltips", "asyncparticles"
 }
 
 KNOWN_CLIENT_OPTIONAL: Set[str] = {
@@ -65,8 +67,8 @@ KNOWN_CLIENT_OPTIONAL: Set[str] = {
     "inventoryprofilesnext", "libipn", "diorama", "cloth-config", "cloth_config",
     "yet_another_config_lib", "fzzy_config", "mezz_config", "zconfig",
     "lithium", "ferritecore", "modernfix", "c2me", "fastasyncworldsave",
-    "ksyxis", "fasterblockentities", "asynclogger", "async", "fastsuite",
-    "krypton", "scalablelux", "zfastnoise"
+    "fasterblockentities", "asynclogger", "fastsuite",
+    "krypton", "scalablelux"
 }
 
 # Известные иконки лаунчера
@@ -324,6 +326,10 @@ def classify_mod(m: dict) -> Tuple[str, str]:
     fname = m["filename"].lower()
     mod_id = (m["id"] or "").lower()
 
+    # 0. Серверный префикс имени файла
+    if fname.startswith("server_") or fname.startswith("server-"):
+        return "server-only", "Серверный префикс имени файла (server_)"
+
     # 1. Известные серверные
     if any(s in mod_id or s in fname for s in KNOWN_SERVER_ONLY):
         return "server-only", "Серверная утилита / античит / админка"
@@ -365,7 +371,7 @@ def categorize_mod(m: dict, status: str) -> str:
         "sodium", "embeddium", "lithium", "ferritecore", "modernfix", "badoptimizations",
         "immediatelyfast", "entityculling", "moreculling", "fasterblockentities",
         "enhancedblockentities", "c2me", "fastasyncworldsave", "gpumemleakfix",
-        "fastsuite", "ksyxis", "asynclogger", "async", "zfastnoise", "krypton", "scalablelux"
+        "fastsuite", "asynclogger", "krypton", "scalablelux"
     ]
     if any(k in mod_id or k in fname for k in opt_keywords):
         return "Оптимизация"
@@ -376,7 +382,7 @@ def categorize_mod(m: dict, status: str) -> str:
         "entity_sound_features", "continuity", "visuality", "fallingleaves",
         "notenoughanimations", "eatinganimation", "eating-animation", "3dskinlayers",
         "skinlayers", "lambdynamiclights", "variants-cit", "spawnanimations",
-        "spawn-animations", "windy", "immersive_paintings", "leavesbegone", "asyncparticles"
+        "spawn-animations", "windy", "immersive_paintings", "asyncparticles"
     ]
     if any(k in mod_id or k in fname for k in gfx_keywords):
         return "Графика"
@@ -669,51 +675,56 @@ def generate_launcher_mod_groups_js(active_mods: List[dict], output_path: str) -
 
 
 # ============================================================================
-# Разделение модов по директориям
+# Разделение клиентских модов и префиксирование серверных
 # ============================================================================
 
-def separate_mods(mods_dir: str, client_mods_dir: str, server_mods_dir: Optional[str] = None, dry_run: bool = False) -> None:
+def separate_mods(mods_dir: str, client_mods_dir: str, dry_run: bool = False) -> None:
     """
-    Разделяет моды в указанной директории:
-      - client-only моды переносит в client_mods_dir
-      - server-only моды (если указан server_mods_dir) переносит в server_mods_dir
-      - both / content моды оставляет в mods_dir
+    Разделяет моды:
+      - client-only моды переносит в client_mods_dir (для синка клиентам без нагрузки на сервер).
+      - server-only моды оставляет в mods_dir, добавляя префикс 'server_' (чтобы сервер загружал jar,
+        а ManifestService и sync_service исключали их из клиентского манифеста).
+      - both / content моды оставляет в mods_dir как есть.
     """
     os.makedirs(client_mods_dir, exist_ok=True)
-    if server_mods_dir:
-        os.makedirs(server_mods_dir, exist_ok=True)
 
     jars = sorted(glob.glob(os.path.join(mods_dir, "*.jar")))
-    print(f"\nНачало разделения модов в: {mods_dir} (Всего: {len(jars)} jar)")
+    print(f"\nНачало обработки модов в: {mods_dir} (Всего: {len(jars)} jar)")
 
     moved_client = 0
-    moved_server = 0
+    renamed_server = 0
     kept_both = 0
 
     for jar_path in jars:
         info = inspect_jar(jar_path)
         status, reason = classify_mod(info)
+        fn = info["filename"]
 
         if status == "client-only":
-            dest = os.path.join(client_mods_dir, info["filename"])
-            print(f"  [CLIENT-ONLY] {info['filename']} -> {client_mods_dir} ({reason})")
+            dest = os.path.join(client_mods_dir, fn)
+            print(f"  [CLIENT-ONLY] {fn} -> {client_mods_dir} ({reason})")
             if not dry_run:
                 shutil.move(jar_path, dest)
             moved_client += 1
-        elif status == "server-only" and server_mods_dir:
-            dest = os.path.join(server_mods_dir, info["filename"])
-            print(f"  [SERVER-ONLY] {info['filename']} -> {server_mods_dir} ({reason})")
-            if not dry_run:
-                shutil.move(jar_path, dest)
-            moved_server += 1
+        elif status == "server-only":
+            fn_lower = fn.lower()
+            if not fn_lower.startswith("server_") and not fn_lower.startswith("server-"):
+                new_fn = f"server_{fn}"
+                dest = os.path.join(mods_dir, new_fn)
+                print(f"  [SERVER-ONLY] {fn} -> {new_fn} (добавлен префикс server_, {reason})")
+                if not dry_run:
+                    shutil.move(jar_path, dest)
+                renamed_server += 1
+            else:
+                print(f"  [SERVER-ONLY] {fn} (уже имеет префикс server_, {reason})")
+                renamed_server += 1
         else:
             kept_both += 1
 
     mode_str = "[DRY-RUN] " if dry_run else ""
-    print(f"\n{mode_str}Итоги разделения:")
+    print(f"\n{mode_str}Итоги:")
     print(f"  Перемещено в клиентские (client_mods): {moved_client}")
-    if server_mods_dir:
-        print(f"  Перемещено в серверные (server_mods): {moved_server}")
+    print(f"  Серверные с префиксом server_ в mods/: {renamed_server}")
     print(f"  Осталось в общих (mods): {kept_both}")
 
 
@@ -724,10 +735,9 @@ def separate_mods(mods_dir: str, client_mods_dir: str, server_mods_dir: Optional
 def main() -> None:
     parser = argparse.ArgumentParser(description="GanjaCraft Mod Classifier & Launcher Configurator")
     parser.add_argument("--scan", type=str, help="Просканировать директорию с модами и вывести детальный отчет")
-    parser.add_argument("--separate", type=str, help="Директория с модами для разделения на клиентские/серверные")
-    parser.add_argument("--client-dir", type=str, help="Целевая директория для client-only модов (по умолч. client_mods)")
-    parser.add_argument("--server-dir", type=str, help="Целевая директория для server-only модов")
-    parser.add_argument("--dry-run", action="store_true", help="Не перемещать файлы, только вывести действия")
+    parser.add_argument("--separate", type=str, help="Директория mods для разделения client-only модов и префиксирования server_")
+    parser.add_argument("--client-dir", type=str, help="Целевая директория для client-only модов (по умолч. client_mods рядом)")
+    parser.add_argument("--dry-run", action="store_true", help="Не перемещать/переименовывать файлы, только вывести действия")
     parser.add_argument("--update-launcher", action="store_true", help="Сгенерировать актуальный mod-groups.js для лаунчера")
     parser.add_argument("--output-js", type=str, help="Путь для вывода mod-groups.js")
 
@@ -768,7 +778,7 @@ def main() -> None:
     if args.separate:
         src = args.separate
         client_dir = args.client_dir or os.path.join(os.path.dirname(src.rstrip("/\\")), "client_mods")
-        separate_mods(src, client_dir, args.server_dir, dry_run=args.dry_run)
+        separate_mods(src, client_dir, dry_run=args.dry_run)
         return
 
     if args.update_launcher:
