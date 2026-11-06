@@ -39,59 +39,49 @@ export function renderLauncherUpdateButton() {
     if (!playBtn) return;
 
     if (updaterState.isDownloaded) {
-        playBtn.className = 'magnetic-play-btn-circle is-update-btn is-ready-to-install';
+        playBtn.className = 'launcher-play-btn is-update-btn is-ready-to-install';
         playBtn.setAttribute('title', 'Установить обновление и перезапустить');
         playBtn.setAttribute('aria-label', 'Перезапустить');
         playBtn.innerHTML = `
-            <span class="play-btn-glow-ring update-glow ready-glow"></span>
-            <svg class="play-btn-progress-svg" viewBox="0 0 80 80">
-                <circle class="progress-bar-circle completed" cx="40" cy="40" r="35" fill="none" stroke="#39ff14" stroke-width="4" stroke-linecap="round" stroke-dasharray="219.91" stroke-dashoffset="0" transform="rotate(-90 40 40)"/>
-            </svg>
-            <svg class="play-btn-update-icon ready-icon" viewBox="0 0 24 24" fill="none" stroke="#39ff14" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
+            <svg class="play-btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M23 4v6h-6"></path>
                 <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
             </svg>
+            <span class="play-btn-text">ПЕРЕЗАПУСТИТЬ</span>
         `;
     } else if (updaterState.isDownloading) {
-        playBtn.className = 'magnetic-play-btn-circle is-update-btn is-downloading';
+        playBtn.className = 'launcher-play-btn is-update-btn is-downloading';
         const percentVal = Math.max(0, Math.min(100, updaterState.percent || 0));
-        const dashOffset = (219.91 * (1 - percentVal / 100)).toFixed(2);
         const displayPercent = String(Math.round(percentVal)).padStart(2, '0');
         const titleText = `Загрузка обновления: ${percentVal}%`;
         playBtn.setAttribute('title', titleText);
         playBtn.setAttribute('aria-label', titleText);
         playBtn.innerHTML = `
-            <span class="play-btn-glow-ring update-glow pulse-fast"></span>
-            <svg class="play-btn-progress-svg" viewBox="0 0 80 80">
-                <circle class="progress-bg" cx="40" cy="40" r="35" fill="none" stroke="rgba(0, 229, 255, 0.15)" stroke-width="4"/>
-                <circle class="progress-bar-circle" cx="40" cy="40" r="35" fill="none" stroke="#00e5ff" stroke-width="4" stroke-linecap="round"
-                        stroke-dasharray="219.91" stroke-dashoffset="${dashOffset}"
-                        transform="rotate(-90 40 40)"/>
-            </svg>
-            <div class="play-btn-percent-text">${displayPercent}<span class="percent-sign">%</span></div>
+            <span class="play-btn-spinner"></span>
+            <span class="play-btn-text">ЗАГРУЗКА ${displayPercent}%</span>
         `;
     } else if (updaterState.isAvailable) {
-        playBtn.className = 'magnetic-play-btn-circle is-update-btn';
+        playBtn.className = 'launcher-play-btn is-update-btn';
         const titleText = updaterState.version ? `Обновить лаунчер (v${updaterState.version})` : 'Обновить лаунчер';
         playBtn.setAttribute('title', titleText);
         playBtn.setAttribute('aria-label', 'Обновить');
         playBtn.innerHTML = `
-            <span class="play-btn-glow-ring update-glow"></span>
-            <svg class="play-btn-update-icon" viewBox="0 0 24 24" fill="none" stroke="#00e5ff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
+            <svg class="play-btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
                 <polyline points="7 10 12 15 17 10"></polyline>
                 <line x1="12" y1="15" x2="12" y2="3"></line>
             </svg>
+            <span class="play-btn-text">ОБНОВИТЬ</span>
         `;
     } else {
-        playBtn.className = 'magnetic-play-btn-circle';
+        playBtn.className = 'launcher-play-btn';
         playBtn.setAttribute('title', 'Играть');
         playBtn.setAttribute('aria-label', 'Играть');
         playBtn.innerHTML = `
-            <span class="play-btn-glow-ring"></span>
-            <svg class="play-btn-triangle-icon" viewBox="0 0 24 24" fill="#ffffff">
+            <svg class="play-btn-icon" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M8 5v14l11-7z"/>
             </svg>
+            <span class="play-btn-text">ИГРАТЬ</span>
         `;
     }
 }

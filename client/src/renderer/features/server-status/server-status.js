@@ -38,30 +38,35 @@ export async function initBuildProfileSelector(config = {}) {
             serverPort: Number(profile.serverPort) || 25565,
         }));
 
+    const defaultProfileId = profiles.some(p => p.id === 'ganj4craft5')
+        ? 'ganj4craft5'
+        : (profiles[0]?.id || '');
+
     const storedId = window.__activeBuildProfileId
         || localStorage.getItem('selected_build_profile')
         || (config.isDefault ? '' : config.activeProfileId || '');
 
-    selector.replaceChildren(new Option('Выберите сборку', ''));
+    const activeId = profiles.some(profile => profile.id === storedId)
+        ? storedId
+        : defaultProfileId;
+
+    selector.replaceChildren();
     profiles.forEach(profile => {
         selector.appendChild(new Option(
             profile.shortName || profile.name || profile.id,
             profile.id
         ));
     });
-    selector.value = profiles.some(profile => profile.id === storedId) ? storedId : '';
-    window.__activeBuildProfileId = selector.value || undefined;
-    setServerProfile(selector.value ? profiles.find(profile => profile.id === selector.value) : null);
+    selector.value = activeId;
+    window.__activeBuildProfileId = activeId;
+    localStorage.setItem('selected_build_profile', activeId);
+    setServerProfile(profiles.find(profile => profile.id === activeId) || null);
 
     const applyProfile = async (profileId) => {
-        const profile = profiles.find(item => item.id === profileId);
-        if (!profile) {
-            window.__activeBuildProfileId = undefined;
-            localStorage.removeItem('selected_build_profile');
-            setServerProfile(null);
-            window.dispatchEvent(new CustomEvent('build-profile-changed', { detail: null }));
-            return;
-        }
+        const profile = profiles.find(item => item.id === profileId)
+            || profiles.find(item => item.id === defaultProfileId)
+            || profiles[0];
+        if (!profile) return;
 
         selector.disabled = true;
         try {
@@ -73,7 +78,6 @@ export async function initBuildProfileSelector(config = {}) {
             window.dispatchEvent(new CustomEvent('build-profile-changed', { detail: selected }));
         } catch (error) {
             console.error('[Profile] Failed to save selected build:', error);
-            selector.value = '';
         } finally {
             selector.disabled = false;
             updatePlayAvailability();
@@ -81,11 +85,7 @@ export async function initBuildProfileSelector(config = {}) {
     };
 
     selector.onchange = () => applyProfile(selector.value);
-    if (selector.value) {
-        const selected = profiles.find(profile => profile.id === selector.value);
-        setServerProfile(selected);
-        window.__activeBuildProfileId = selected.id;
-    }
+    applyProfile(selector.value);
     updatePlayAvailability();
     return profiles;
 }

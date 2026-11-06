@@ -178,11 +178,9 @@ export async function loadChangelogHistory(profileId = window.__activeBuildProfi
 
         checkChangelogBadge();
         renderChangelogList();
-        renderChangelogList('dashboard-changelog-list');
     } catch (e) {
         console.warn('[Changelog] Failed to load history:', e);
         renderEmptyState('Ошибка загрузки истории обновлений', 'changelog-list');
-        renderEmptyState('Ошибка загрузки обновлений', 'dashboard-changelog-list');
     }
 }
 
@@ -195,23 +193,13 @@ export function checkChangelogBadge() {
     const settingsScreen = dom.get('step-settings');
     const isSettingsOpen = settingsScreen && !settingsScreen.classList.contains('hidden') && !settingsScreen.classList.contains('closing');
 
-    // Если сейчас открыты настройки — кнопка колокольчика ВСЕГДА скрыта
+    // Если сейчас открыты настройки — кнопка колокольчика скрыта (вкладка ОБНОВЛЕНИЯ доступна в меню)
     if (isSettingsOpen) {
         if (btnChangelog) btnChangelog.classList.add('hidden');
         return;
     }
 
-    if ((!cachedPackHistory || cachedPackHistory.length === 0) &&
-        (!cachedLauncherReleases || cachedLauncherReleases.length === 0) &&
-        (!cachedNews || cachedNews.length === 0)) {
-        if (badge) badge.classList.add('hidden');
-        if (btnChangelog) btnChangelog.classList.add('hidden');
-        return;
-    }
-
-    // The dashboard and the dedicated changelog tab share the same feed.
-    // Keep the bell available after the user has seen the latest item; only
-    // the unread badge should disappear.
+    // На главном экране колокольчик всегда доступен в топ баре
     if (btnChangelog) btnChangelog.classList.remove('hidden');
 
     const compoundId = getLatestCompoundId();
@@ -219,7 +207,6 @@ export function checkChangelogBadge() {
     const hasUnseen = Boolean(compoundId && seenId !== compoundId);
 
     if (hasUnseen) {
-        if (btnChangelog) btnChangelog.classList.remove('hidden');
         if (badge) badge.classList.remove('hidden');
     } else {
         if (badge) badge.classList.add('hidden');

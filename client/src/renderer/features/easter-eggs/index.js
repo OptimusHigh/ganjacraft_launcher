@@ -1,12 +1,10 @@
 import { pseudoConsole } from './pseudo-console.js';
-import { particlePopper } from './particle-pop.js';
 import { skinTricks } from './skin-tricks.js';
 import { initBlazeRave, triggerBlazeRave, isBlazeRaveActive } from './blaze-rave.js';
 import { triggerMemeWebcam, tryTriggerSettingsEasterEgg, isMemeWebcamActive } from './meme-webcam.js';
 import { audioSynth } from './audio-synth.js';
 
 export { pseudoConsole } from './pseudo-console.js';
-export { particlePopper } from './particle-pop.js';
 export { skinTricks } from './skin-tricks.js';
 export { triggerBlazeRave, isBlazeRaveActive } from './blaze-rave.js';
 export { triggerMemeWebcam, tryTriggerSettingsEasterEgg, isMemeWebcamActive } from './meme-webcam.js';
@@ -19,13 +17,10 @@ let secretKeyTimeout = null;
  * Инициализация всех систем пасхалок
  */
 export function initAllEasterEggs() {
-    // 1. Интерактивное лопание падающих частиц и комбо по листку
-    particlePopper.init();
-
-    // 2. Акробатика 3D скина при двойном клике
+    // 1. Акробатика 3D скина при двойном клике
     skinTricks.init();
 
-    // 3. 420 Rave Mode
+    // 2. 420 Rave Mode
     initBlazeRave();
 
     // 4. Горячая клавиша открытия псевдо-консоли (~ / ё / F12 / ввод "admin"/"op"/"hack")

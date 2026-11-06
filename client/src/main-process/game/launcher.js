@@ -680,8 +680,20 @@ async function syncMods(event, rootPath, config, sendLog, sendDebug, options = {
     ensureRequiredResourcePacks(rootPath, sendLog, sendDebug);
 }
 
+function getProfileVersionId(profile) {
+    if (profile.loader === 'neoforge') {
+        return `neoforge-${profile.neoforgeVersion || NEOFORGE_VERSION}`;
+    }
+    if (profile.loader === 'fabric') {
+        return `fabric-loader-${profile.fabricLoaderVersion}-${profile.minecraftVersion}`;
+    }
+    return profile.minecraftVersion;
+}
+
 /**
  * Подготовить Fabric version metadata для MCLC.
+ * Fabric возвращает только свои библиотеки и Knot mainClass с inheritsFrom.
+ * Так как MCLC не разрешает inheritsFrom автоматически, мы объединяем метаданные с ванильным JSON.
  */
 async function ensureFabricVersionJson(rootPath, sendLog, sendDebug, options = {}) {
     const signal = options.signal;
@@ -690,21 +702,47 @@ async function ensureFabricVersionJson(rootPath, sendLog, sendDebug, options = {
     const versionId = `fabric-loader-${loaderVersion}-${minecraftVersion}`;
     const versionDir = path.join(rootPath, 'versions', versionId);
     const versionJsonPath = path.join(versionDir, `${versionId}.json`);
+    const rawFabricPath = path.join(versionDir, `raw-fabric-${loaderVersion}-${minecraftVersion}.json`);
     const metadataUrl = `https://meta.fabricmc.net/v2/versions/loader/${encodeURIComponent(minecraftVersion)}/${encodeURIComponent(loaderVersion)}/profile/json`;
+    const vanillaJsonPath = path.join(rootPath, 'versions', minecraftVersion, `${minecraftVersion}.json`);
 
     if (signal?.aborted) throw new Error('CANCELLED');
 
-    let versionJson = null;
+    // 1. Проверяем, существует ли уже валидный смердженный JSON
+    let isAlreadyMerged = false;
     if (fs.existsSync(versionJsonPath)) {
         try {
             const existing = JSON.parse(fs.readFileSync(versionJsonPath, 'utf8'));
-            if (existing?.id === versionId && existing.inheritsFrom === minecraftVersion && Array.isArray(existing.libraries)) {
-                versionJson = existing;
+            if (
+                existing?.id === versionId &&
+                existing.inheritsFrom === minecraftVersion &&
+                existing.assetIndex?.url &&
+                existing.downloads?.client?.url &&
+                Array.isArray(existing.libraries) &&
+                existing.libraries.length > 20
+            ) {
+                isAlreadyMerged = true;
+                if (sendDebug) sendDebug(`Fabric version metadata is valid and merged: ${versionId}`);
             }
         } catch { }
     }
 
-    if (!versionJson) {
+    if (isAlreadyMerged) {
+        return { versionId, versionJsonPath };
+    }
+
+    // 2. Получаем сырые метаданные Fabric
+    let rawFabricJson = null;
+    if (fs.existsSync(rawFabricPath)) {
+        try {
+            const parsed = JSON.parse(fs.readFileSync(rawFabricPath, 'utf8'));
+            if (parsed?.id === versionId && parsed.inheritsFrom === minecraftVersion && Array.isArray(parsed.libraries)) {
+                rawFabricJson = parsed;
+            }
+        } catch { }
+    }
+
+    if (!rawFabricJson) {
         sendLog(`Загрузка metadata Fabric Loader ${loaderVersion} для Minecraft ${minecraftVersion}...`);
         const response = await fetch(metadataUrl, { signal });
         if (!response.ok) throw new Error(`Fabric metadata вернул HTTP ${response.status}`);
@@ -715,21 +753,71 @@ async function ensureFabricVersionJson(rootPath, sendLog, sendDebug, options = {
         }
 
         fs.mkdirSync(versionDir, { recursive: true });
-        const tempPath = `${versionJsonPath}.tmp`;
+        const tempRaw = `${rawFabricPath}.tmp`;
         try {
-            fs.writeFileSync(tempPath, JSON.stringify(metadata, null, 2), 'utf8');
-            fs.renameSync(tempPath, versionJsonPath);
-        } catch (error) {
-            try { if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath); } catch { }
-            throw error;
+            fs.writeFileSync(tempRaw, JSON.stringify(metadata, null, 2), 'utf8');
+            fs.renameSync(tempRaw, rawFabricPath);
+        } catch (err) {
+            try { if (fs.existsSync(tempRaw)) fs.unlinkSync(tempRaw); } catch { }
+            throw err;
         }
-        versionJson = metadata;
+        rawFabricJson = metadata;
         sendLog(`Fabric Loader ${loaderVersion} подготовлен.`);
-    } else {
-        sendDebug(`Fabric version metadata is valid: ${versionId}`);
     }
 
-    return { versionId, versionJsonPath, versionJson };
+    // 3. Проверяем наличие ванильного JSON для наследования
+    if (!fs.existsSync(vanillaJsonPath)) {
+        throw new Error(`Файл версии Minecraft ${minecraftVersion}.json не найден (${vanillaJsonPath})`);
+    }
+
+    const vanillaJson = JSON.parse(fs.readFileSync(vanillaJsonPath, 'utf8'));
+
+    // 4. Смердживаем метаданные Fabric и Vanilla
+    sendLog(`Объединение метаданных Fabric и Minecraft ${minecraftVersion}...`);
+    const merged = { ...vanillaJson, ...rawFabricJson };
+    merged.id = versionId;
+    merged.assetIndex = vanillaJson.assetIndex;
+    merged.assets = vanillaJson.assets;
+    merged.downloads = vanillaJson.downloads;
+
+    // Объединяем библиотеки: Fabric в начало (для приоритета класспаса), затем Vanilla
+    const existingNames = new Set((rawFabricJson.libraries || []).map(l => l.name));
+    merged.libraries = [...(rawFabricJson.libraries || [])];
+    if (Array.isArray(vanillaJson.libraries)) {
+        for (const lib of vanillaJson.libraries) {
+            if (!existingNames.has(lib.name)) {
+                merged.libraries.push(lib);
+                existingNames.add(lib.name);
+            }
+        }
+    }
+
+    // Объединяем аргументы игры
+    const vanillaGameArgs = (vanillaJson.arguments && Array.isArray(vanillaJson.arguments.game)) ? vanillaJson.arguments.game : [];
+    const fabricGameArgs = (rawFabricJson.arguments && Array.isArray(rawFabricJson.arguments.game)) ? rawFabricJson.arguments.game : [];
+    merged.arguments = merged.arguments || {};
+    merged.arguments.game = [...fabricGameArgs, ...vanillaGameArgs];
+
+    // Объединяем JVM аргументы
+    const vanillaJvmArgs = (vanillaJson.arguments && Array.isArray(vanillaJson.arguments.jvm)) ? vanillaJson.arguments.jvm : [];
+    const fabricJvmArgs = (rawFabricJson.arguments && Array.isArray(rawFabricJson.arguments.jvm)) ? rawFabricJson.arguments.jvm : [];
+    merged.arguments.jvm = [...vanillaJvmArgs, ...fabricJvmArgs];
+
+    // Main class обязательно от Fabric (KnotClient)
+    merged.mainClass = rawFabricJson.mainClass || vanillaJson.mainClass;
+
+    fs.mkdirSync(versionDir, { recursive: true });
+    const tempMergedPath = `${versionJsonPath}.tmp`;
+    try {
+        fs.writeFileSync(tempMergedPath, JSON.stringify(merged, null, 2), 'utf8');
+        fs.renameSync(tempMergedPath, versionJsonPath);
+    } catch (err) {
+        try { if (fs.existsSync(tempMergedPath)) fs.unlinkSync(tempMergedPath); } catch { }
+        throw err;
+    }
+
+    if (sendDebug) sendDebug(`Fabric version JSON merged successfully (${merged.libraries.length} libs).`);
+    return { versionId, versionJsonPath, versionJson: merged };
 }
 
 function buildLaunchOptions(config, rootPath, javaPath, forgeInstallerPath, authlibPath, authSession, authlibPrefetched, profile) {
@@ -760,7 +848,7 @@ function buildLaunchOptions(config, rootPath, javaPath, forgeInstallerPath, auth
         customArgs.unshift(`-javaagent:${authlibPath}=${BASE_URL}/api/yggdrasil`);
     }
 
-    const versionId = isNeoForge ? `neoforge-${profile.neoforgeVersion || NEOFORGE_VERSION}` : profile.loader === 'fabric' ? `fabric-loader-${profile.fabricLoaderVersion}-${profile.minecraftVersion}` : profile.minecraftVersion;
+    const versionId = getProfileVersionId(profile);
     const versionJsonPath = path.join(rootPath, 'versions', versionId, `${versionId}.json`);
 
     const nativesDir = path.join(rootPath, 'natives');
@@ -872,11 +960,11 @@ function handleLaunchError(error, rootPath, profile) {
  * Запустить игру
  */
 async function launchGame(event, options) {
-    const requestedProfileId = options && typeof options.profileId === 'string'
+    let requestedProfileId = options && typeof options.profileId === 'string'
         ? options.profileId.trim()
         : '';
     if (requestedProfileId !== 'vanilla' && requestedProfileId !== 'ganj4craft5') {
-        return { success: false, error: 'Сначала выберите сборку в лаунчере.' };
+        requestedProfileId = 'ganj4craft5';
     }
     if (isGameRunning) {
         return { success: false, error: "Игра уже запущена!" };
@@ -1217,11 +1305,14 @@ async function launchGame(event, options) {
 
         checkCancelled();
 
+        const profileVersionId = getProfileVersionId(profile);
+
         // Ensure the selected Minecraft version's asset index exists and is populated.
         await ensureAssetIndex(rootPath, sendLog, {
             signal,
             minecraftVersion: profile.minecraftVersion,
             neoforgeVersion: profile.neoforgeVersion,
+            customVersionId: profileVersionId,
         });
 
         checkCancelled();
@@ -1316,6 +1407,18 @@ async function launchGame(event, options) {
 
             let detectedFatalClassError = false;
             let gameReadyNotified = false;
+            let lastMclcError = null;
+
+            launcher.on('debug', (e) => {
+                const text = String(e).trim();
+                if (text) {
+                    sendDebug(text);
+                    if (text.includes('Failed to start due to')) {
+                        lastMclcError = text;
+                        sendLog(`[LAUNCHER ERROR] ${text}`);
+                    }
+                }
+            });
 
             launcher.on('data', (e) => {
                 const text = String(e).trim();
@@ -1345,13 +1448,17 @@ async function launchGame(event, options) {
                     (text.includes('securejarhandler') && text.includes('ClassNotFoundException'))
                 )) {
                     detectedFatalClassError = true;
-                    sendLog('[LAUNCHER] Обнаружена критическая ошибка загрузки NeoForge. Автоматическое восстановление...');
+                    const loaderTitle = profile.loader === 'fabric' ? 'Fabric' : 'NeoForge';
+                    sendLog(`[LAUNCHER] Обнаружена критическая ошибка загрузки ${loaderTitle}. Автоматическое восстановление...`);
                     if (profile.loader === 'neoforge') {
                         purgeCorruptedNeoForge(rootPath, profile.neoforgeVersion || NEOFORGE_VERSION);
+                    } else if (profile.loader === 'fabric') {
+                        const verJson = path.join(rootPath, 'versions', profileVersionId, `${profileVersionId}.json`);
+                        try { if (fs.existsSync(verJson)) fs.unlinkSync(verJson); } catch { }
                     }
                     sendLog('[LAUNCHER] Повреждённые файлы удалены. Пожалуйста, нажмите «Играть» ещё раз.');
                     safeSend(mainWindow, 'launch-error',
-                        'Обнаружена ошибка NeoForge. Лаунчер автоматически починил файлы.\n' +
+                        `Обнаружена ошибка ${loaderTitle}. Лаунчер автоматически починил файлы.\n` +
                         'Нажмите «Играть» ещё раз!');
                 }
             });
@@ -1393,10 +1500,20 @@ async function launchGame(event, options) {
                         return;
                     }
                     startModWatcher(rootPath, config, proc, sendLog);
-                }
-                if (!hasResolved) {
-                    hasResolved = true;
-                    resolve({ success: true });
+                    if (!hasResolved) {
+                        hasResolved = true;
+                        resolve({ success: true });
+                    }
+                } else {
+                    sendDebug('MCLC launcher returned null/undefined process');
+                    if (!hasResolved) {
+                        hasResolved = true;
+                        isGameRunning = false;
+                        resolve({
+                            success: false,
+                            error: lastMclcError || "Не удалось запустить процесс игры. Проверьте launcher.log."
+                        });
+                    }
                 }
             }).catch(error => {
                 sendDebug(`Launcher promise rejected: ${error.stack}`);
@@ -1445,4 +1562,6 @@ module.exports = {
     launchGame,
     cancelLaunch,
     getIsGameRunning,
+    ensureFabricVersionJson,
+    buildLaunchOptions,
 };

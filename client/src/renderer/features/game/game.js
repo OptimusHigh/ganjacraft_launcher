@@ -50,7 +50,6 @@ export function lockControlsForLaunch() {
     const titleBtn = dom.get('title-bar-title');
     const settingsTabsBar = dom.get('settings-tabs-bar');
     const playBtn = dom.get('play-btn');
-    const popCounter = dom.get('particle-pop-counter');
 
     if (btnSettings) {
         btnSettings.classList.remove('disabled-launch');
@@ -70,16 +69,16 @@ export function lockControlsForLaunch() {
         settingsTabsBar.classList.add('hidden');
     }
 
-    // Трансформируем круглую кнопку Play в кнопку Cancel
+    // Трансформируем кнопку Play в кнопку Отмены
     if (playBtn) {
         playBtn.classList.add('is-cancelling-btn');
         playBtn.setAttribute('title', 'Отменить запуск');
         playBtn.innerHTML = `
-            <span class="play-btn-glow-ring cancel-glow"></span>
-            <svg class="play-btn-cancel-icon" viewBox="0 0 24 24" fill="none" stroke="#ff4d4d" stroke-width="2.6" stroke-linecap="round">
+            <svg class="play-btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
                 <line x1="18" y1="6" x2="6" y2="18"></line>
                 <line x1="6" y1="6" x2="18" y2="18"></line>
             </svg>
+            <span class="play-btn-text">ОТМЕНИТЬ</span>
         `;
     }
 }
@@ -205,17 +204,7 @@ function showPlayScreen() {
 export async function startLaunch() {
     console.log('[GAME] startLaunch() called');
     if (!window.__activeBuildProfileId) {
-        const selector = document.getElementById('build-profile-selector');
-        if (selector) {
-            selector.focus();
-            selector.setAttribute('aria-invalid', 'true');
-            setTimeout(() => selector.removeAttribute('aria-invalid'), 1800);
-        }
-        const message = 'Сначала выберите сборку в списке рядом с кнопкой «Играть».';
-        logToConsole(`[LAUNCHER] ${message}`);
-        showNotification(message, 'warning', 'Сборка не выбрана', 4000);
-        showPlayScreen();
-        return false;
+        window.__activeBuildProfileId = 'ganj4craft5';
     }
     if (isLauncherUpdateAvailable()) {
         handleLauncherUpdateClick();

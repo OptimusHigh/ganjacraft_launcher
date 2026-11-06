@@ -8,7 +8,6 @@ import { dom } from '../../utils/dom.js';
 import { showError } from '../../ui/modals.js';
 import { ERROR_DISPLAY_TIME, API_BASE } from '../../constants.js';
 import { initSkinViewer } from '../skin-viewer/index.js';
-import { initMagneticPlayButton } from '../ui/magnetic-button.js';
 
 // Локальный стейт для auth flow
 let currentUsername = '';
@@ -267,9 +266,6 @@ function showPlayScreen() {
         loadPlayerStats(currentUsername);
     }
 
-    // Инициализируем магнитную физику для кнопки «ИГРАТЬ»
-    console.log('[AUTH] Calling initMagneticPlayButton()');
-    initMagneticPlayButton();
     console.log('[AUTH] showPlayScreen() completed');
 }
 

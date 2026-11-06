@@ -31,9 +31,9 @@ function getDefaultConfig() {
 
         // General: one user-selected root, with isolated profile directories below it.
         installRoot: defaultInstallRoot,
-        // Legacy alias is kept as the Vanilla profile path for older integrations.
-        installPath: path.join(defaultInstallRoot, 'vanilla'),
-        activeProfileId: 'vanilla',
+        // Legacy alias is kept as the default profile path for older integrations.
+        installPath: path.join(defaultInstallRoot, 'ganj4craft5'),
+        activeProfileId: 'ganj4craft5',
         profiles: {
             vanilla: {
                 installPath: path.join(defaultInstallRoot, 'vanilla'),
@@ -97,8 +97,8 @@ function normalizeLoadedConfig(config) {
     merged.profiles.vanilla.disabledMods = Array.isArray(merged.profiles.vanilla.disabledMods)
         ? merged.profiles.vanilla.disabledMods : merged.disabledMods;
     if (!Array.isArray(merged.profiles.ganj4craft5.disabledMods)) merged.profiles.ganj4craft5.disabledMods = [];
-    merged.activeProfileId = merged.activeProfileId === 'ganj4craft5' ? 'ganj4craft5' : 'vanilla';
-    merged.installPath = merged.profiles.vanilla.installPath;
+    merged.activeProfileId = merged.activeProfileId === 'vanilla' ? 'vanilla' : 'ganj4craft5';
+    merged.installPath = merged.profiles[merged.activeProfileId]?.installPath || merged.profiles.ganj4craft5.installPath;
 
     // Migration for older configs (before modsDefaultsApplied existed).
     // We assume existing users already chose their mod state, so don't suddenly disable anything.

@@ -5,7 +5,6 @@
 
 import { getSkinViewer3d, getSkinViewerMode } from '../skin-viewer/skin-viewer.js';
 import { audioSynth } from './audio-synth.js';
-import { particlePopper } from './particle-pop.js';
 import { dom } from '../../utils/dom.js';
 
 class SkinTricksEngine {
@@ -41,15 +40,7 @@ class SkinTricksEngine {
         if (this.isSpinning) return;
         const viewer = getSkinViewer3d();
         const mode = getSkinViewerMode();
-
         const container = dom.get('skin-viewer-container');
-        if (container) {
-            const rect = container.getBoundingClientRect();
-            const cx = rect.left + rect.width / 2;
-            const cy = rect.top + rect.height / 2;
-            particlePopper.spawnSparks(cx, cy);
-            particlePopper.spawnFloatingScore(cx, cy - 60, '✨ 360° SPIN! 🪂');
-        }
 
         audioSynth.playJump();
 

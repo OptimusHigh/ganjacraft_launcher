@@ -349,6 +349,7 @@ function ensureNeoForgeVersionJsonMerged(rootPath, sendDebug, options = {}) {
 async function ensureAssetIndex(rootPath, sendLog, options = {}) {
     const signal = options.signal;
     const minecraftVersion = options.minecraftVersion || MC_VERSION;
+    const customVersionId = options.customVersionId;
     if (signal && signal.aborted) {
         throw new Error('CANCELLED');
     }
@@ -363,6 +364,18 @@ async function ensureAssetIndex(rootPath, sendLog, options = {}) {
     const assetIndexDir = path.join(rootPath, 'assets', 'indexes');
     fs.mkdirSync(assetIndexDir, { recursive: true });
     const indexPath = path.join(assetIndexDir, `${assetIndex.id}.json`);
+
+    const ensureCustomIndexCopy = () => {
+        if (customVersionId && customVersionId !== assetIndex.id) {
+            const customIndexPath = path.join(assetIndexDir, `${customVersionId}.json`);
+            if (!fs.existsSync(customIndexPath)) {
+                try {
+                    fs.copyFileSync(indexPath, customIndexPath);
+                } catch { }
+            }
+        }
+    };
+
     let needDownload = !fs.existsSync(indexPath);
     if (!needDownload) {
         try {
@@ -373,7 +386,10 @@ async function ensureAssetIndex(rootPath, sendLog, options = {}) {
         }
     }
 
-    if (!needDownload) return;
+    if (!needDownload) {
+        ensureCustomIndexCopy();
+        return;
+    }
 
     if (sendLog) sendLog(`Загрузка индекса ресурсов Minecraft ${minecraftVersion} (${assetIndex.id})...`);
     const tmpFile = `${indexPath}.tmp`;
@@ -385,6 +401,7 @@ async function ensureAssetIndex(rootPath, sendLog, options = {}) {
             throw new Error(`Загруженный asset index ${assetIndex.id} пуст или некорректен`);
         }
         fs.renameSync(tmpFile, indexPath);
+        ensureCustomIndexCopy();
         if (sendLog) sendLog(`Индекс ресурсов Minecraft ${minecraftVersion} готов.`);
     } catch (e) {
         try { if (fs.existsSync(tmpFile)) fs.unlinkSync(tmpFile); } catch { }

@@ -53,28 +53,8 @@
     width: 100%;
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    justify-content: flex-start;
     gap: 10px;
-}
-
-.launch-kills-badge {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    background: rgba(255, 0, 85, 0.15);
-    border: 1px solid rgba(255, 0, 85, 0.4);
-    border-radius: 12px;
-    padding: 2px 8px;
-    font-size: 10.5px;
-    font-weight: 800;
-    color: #ff3366;
-    letter-spacing: 0.5px;
-    white-space: nowrap;
-}
-
-.launch-kills-badge strong {
-    color: #fff;
-    font-size: 12px;
 }
 
 /* ── Progress Header ── */
@@ -366,15 +346,10 @@
     color: #ff6b6b !important;
 }
 
-/* ── Hide all game elements and progress bars when viewing launch logs ── */
+/* ── Hide launcher controls and progress bars when viewing launch logs ── */
 body.log-modal-open .player-character-section,
 body.log-modal-open #skin-viewer-container,
-body.log-modal-open #step-progress,
-body.log-modal-open .player-defense-container,
-body.log-modal-open .player-defense-hud,
-body.log-modal-open .boss-health-container,
-body.log-modal-open .active-buffs-bar,
-body.log-modal-open .launch-kills-badge {
+body.log-modal-open #step-progress {
     opacity: 0 !important;
     visibility: hidden !important;
     pointer-events: none !important;

@@ -26,8 +26,8 @@ const BUILD_PROFILES = {
     },
     ganj4craft5: {
         id: 'ganj4craft5',
-        name: 'GANJ4CRAFT 5',
-        shortName: 'GANJ4CRAFT 5',
+        name: 'ThaumParty',
+        shortName: 'ThaumParty',
         loader: 'neoforge',
         minecraftVersion: '26.1.2',
         neoforgeVersion: '26.1.2.126',
@@ -41,7 +41,7 @@ const BUILD_PROFILES = {
 };
 
 function getBuildProfile(profileId) {
-    return BUILD_PROFILES[profileId] || BUILD_PROFILES.vanilla;
+    return BUILD_PROFILES[profileId] || BUILD_PROFILES.ganj4craft5;
 }
 
 const path = require('path');
@@ -124,24 +124,43 @@ function getMirrorFallbackUrl(url) {
 
 // Default disabled optional mods (filename patterns)
 const DEFAULT_DISABLED_OPTIONAL_MOD_PATTERNS = [
-    // Forgematica & Printer (schematics)
+    // Forgematica & Litematica & Printer (schematics)
     'client-forgematica',
     'client-Forgematica',
+    'forgematica',
+    'Forgematica',
+    'litematica',
+    'Litematica',
     'client-neoforgematicaprinter',
     'client-NeoForgematicaPrinter',
+    'printer',
+    'Printer',
 
     // Better Advancements
     'client-betteradvancements',
     'client-BetterAdvancements',
+    'betteradvancements',
+    'BetterAdvancements',
 
     // Better Third Person
     'client-betterthirdperson',
     'client-BetterThirdPerson',
+    'betterthirdperson',
+    'BetterThirdPerson',
     'client-leawind_third_person',
+    'leawind_third_person',
 
     // First Person Model
     'client-firstperson',
-    'client-FirstPerson'
+    'client-FirstPerson',
+    'firstperson',
+    'FirstPerson',
+
+    // Freecam & X-Ray (disabled by default)
+    'freecam',
+    'Freecam',
+    'advanced-xray',
+    'xray'
 ];
 
 // JVM optimization arguments

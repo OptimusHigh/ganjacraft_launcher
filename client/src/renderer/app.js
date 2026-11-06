@@ -284,10 +284,6 @@ async function init() {
     initConsoleActions();
     initSettingsButton();
     initChangelog();
-    const dashboardChangelogButton = dom.get('dashboard-open-changelog');
-    if (dashboardChangelogButton) {
-        dashboardChangelogButton.addEventListener('click', () => openChangelogScreen());
-    }
     initWardrobeModal();
     initAuthHandlers();
     initProgressHandlers();

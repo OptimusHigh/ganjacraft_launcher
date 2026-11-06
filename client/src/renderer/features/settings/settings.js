@@ -439,7 +439,7 @@ export function populateSettingsFields(config) {
     currentConfig = config || {};
     initDOMRefs();
 
-    const activeProfileId = window.__activeBuildProfileId || currentConfig.activeProfileId || 'vanilla';
+    const activeProfileId = window.__activeBuildProfileId || currentConfig.activeProfileId || 'ganj4craft5';
     const activeProfile = currentConfig.profiles?.[activeProfileId];
     const activeInstallPath = currentConfig.installRoot || activeProfile?.installPath || currentConfig.installPath || '';
 
@@ -498,7 +498,7 @@ export async function saveSettings() {
     const selectedSkinMode = document.getElementById('setting-skin-mode')?.value || '3d';
     const selectedDiscordRpc = document.getElementById('setting-enable-discord-rpc')?.checked ?? true;
 
-    const activeProfileId = window.__activeBuildProfileId || currentConfig.activeProfileId || 'vanilla';
+    const activeProfileId = window.__activeBuildProfileId || currentConfig.activeProfileId || 'ganj4craft5';
     const selectedInstallRoot = document.getElementById('setting-path')?.value || '';
     const rootPath = selectedInstallRoot.replace(/[\\/]+$/, '');
     const profiles = {

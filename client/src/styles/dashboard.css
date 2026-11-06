@@ -133,190 +133,31 @@
 }
 
 .main-dashboard-layout {
-    display: grid;
-    grid-template-columns: minmax(210px, 280px) minmax(360px, 1fr) minmax(210px, 270px);
-    grid-template-rows: minmax(0, 1fr);
-    align-items: stretch;
-    width: min(1180px, 100%);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
     height: 100%;
     margin: 0 auto;
-    gap: clamp(16px, 2.4vw, 34px);
     box-sizing: border-box;
-    padding: 22px 24px 18px;
+    padding: 18px 24px 18px;
     position: relative;
 }
 
-.dashboard-updates-panel {
-    grid-column: 1;
-    grid-row: 1;
-    min-width: 0;
-    min-height: 0;
-    display: flex;
-    flex-direction: column;
-    align-self: stretch;
-    padding: 18px 16px;
-    border-left: 2px solid rgba(57, 255, 20, 0.65);
-    background: linear-gradient(90deg, rgba(7, 12, 10, 0.7), rgba(7, 12, 10, 0.16));
-    box-sizing: border-box;
-    animation: dashboard-panel-enter 0.55s cubic-bezier(0.2, 0.8, 0.2, 1) both;
-    overflow: hidden;
-}
-
-.dashboard-updates-heading {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 8px;
-    flex: 0 0 auto;
-    padding-bottom: 14px;
-}
-
-.dashboard-updates-more {
-    width: 32px;
-    height: 32px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    flex: 0 0 auto;
-    color: var(--gc-green);
-    background: rgba(var(--gc-green-rgb), 0.08);
-    border: 1px solid rgba(var(--gc-green-rgb), 0.3);
-    border-radius: var(--gc-radius-sm);
-    cursor: pointer;
-    transition: background var(--gc-duration-fast) ease, border-color var(--gc-duration-fast) ease, transform var(--gc-duration-fast) ease;
-}
-
-.dashboard-updates-more:hover {
-    background: rgba(var(--gc-green-rgb), 0.18);
-    border-color: var(--gc-green);
-    transform: translateX(2px);
-}
-
-.dashboard-panel-heading {
-    flex: 0 0 auto;
-    padding-bottom: 14px;
-}
-
-.dashboard-panel-kicker {
-    color: var(--gc-green);
-    font-size: 9px;
-    font-weight: 800;
-    letter-spacing: 1.8px;
-}
-
-.dashboard-panel-heading h2 {
-    margin: 5px 0 0;
-    color: #f2f5f2;
-    font-size: 19px;
-    font-weight: 750;
-}
-
-.dashboard-changelog-list {
-    min-height: 0;
-    overflow-y: auto;
-    display: flex;
-    flex-direction: column;
-    gap: 11px;
-    padding-right: 5px;
-}
-
-.dashboard-news-placeholder {
-    padding: 12px 0;
-    color: rgba(235, 242, 235, 0.58);
-    font-size: 12px;
-    line-height: 1.5;
-}
-
-.dashboard-news-placeholder.is-error {
-    color: #ff9b8c;
-}
-
-.dashboard-changelog-list .changelog-release-card {
-    padding: 0 0 12px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.dashboard-changelog-list .changelog-release-header {
-    margin-bottom: 6px;
-    color: var(--gc-green);
-    font-size: 10px;
-    font-weight: 700;
-}
-
-.dashboard-changelog-list .changelog-news-image-wrap,
-.dashboard-changelog-list .changelog-card-content {
-    display: block;
-    width: 100%;
-    max-height: 116px;
-    object-fit: cover;
-    margin: 0 0 8px;
-    border-radius: 3px;
-}
-
-.dashboard-changelog-list .changelog-news-text {
-    color: rgba(241, 245, 241, 0.82);
-    font-size: 12px;
-    line-height: 1.55;
-    overflow-wrap: anywhere;
-}
-
-.dashboard-changelog-list .changelog-card-content,
-.dashboard-changelog-list .changelog-news-text,
-.dashboard-changelog-list .changelog-news-image-wrap {
-    max-width: 100%;
-    overflow: hidden;
-}
-
-.dashboard-changelog-list .changelog-card-content {
-    max-height: 170px;
-    overflow-y: auto;
-}
-
-.dashboard-changelog-list .changelog-release-card {
-    margin-bottom: 10px;
-}
-
-@keyframes dashboard-panel-enter {
-    from {
-        opacity: 0;
-        transform: translateX(-10px);
-    }
-
-    to {
-        opacity: 1;
-        transform: translateX(0);
-    }
-}
-
-/* ── Skin Off Mode Layout (Большое лого влево к краю для баланса) ── */
+/* ── Skin Off Mode Layout ── */
 .main-dashboard-layout.layout-skin-off {
-    grid-template-columns: 280px 1fr 240px;
-    justify-content: space-between;
+    justify-content: flex-start;
 }
 
-.main-dashboard-layout.layout-skin-off .hero-brand-section.center-brand {
-    grid-column: 1;
-    width: 100%;
-    max-width: 280px;
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: space-between;
-    padding: 2px 0 6px 0;
-    text-align: center;
-}
-
-.main-dashboard-layout.layout-skin-off .launch-action-hub {
-    grid-column: 3;
-}
-
-/* Center: player character and stats. */
+/* Left: player character and stats */
 .player-character-section {
-    grid-column: 2;
-    width: 100%;
-    max-width: 240px;
-    height: 100%;
+    position: absolute;
+    left: 40px;
+    bottom: 24px;
+    top: 24px;
+    width: 380px;
+    max-width: 420px;
+    height: calc(100% - 48px);
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -326,8 +167,9 @@
     border: none;
     box-shadow: none;
     z-index: 10;
-    padding: 16px 0;
+    padding: 8px 0 4px 0;
     overflow: visible;
+    transition: opacity 0.3s ease;
 }
 
 /* Minecraft In-Game Overhead Nametag */
@@ -336,8 +178,8 @@
     justify-content: center;
     align-items: center;
     width: 100%;
-    margin-top: 0;
-    margin-bottom: 4px;
+    margin-top: 10px;
+    margin-bottom: 2px;
     z-index: 15;
     flex-shrink: 0;
 }
@@ -498,105 +340,15 @@
     margin: 0 2px;
 }
 
-/* ── 2. Center: Cyber Header (GANJ4CRAFT) & Centered Play Button ── */
-.hero-brand-section.center-brand {
-    grid-column: 2;
-    grid-row: 1;
-    position: absolute;
-    top: 25px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: min(380px, 40%);
-    height: 56px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: space-between;
-    padding-top: 52px;
-    padding-bottom: 2px;
-    text-align: center;
-    position: relative;
-    z-index: 25;
-    box-sizing: border-box;
-    pointer-events: none;
-    transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.hero-brand-section.center-brand .cyber-brand-header {
-    pointer-events: auto;
-}
-
-.hero-brand-section.center-brand .play-btn-container {
-    pointer-events: auto;
-}
-
-.cyber-brand-header {
-    position: relative;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 100%;
-    max-width: 380px;
-    height: 56px;
-    flex-shrink: 0;
-    padding: 0 28px;
-    box-sizing: border-box;
-}
-
-.cyber-brackets-svg {
-    position: absolute;
-    width: 100%;
-    height: 100%;
-    top: 0;
-    left: 0;
-    pointer-events: none;
-}
-
-.hero-neon-title-cyber {
-    font-family: var(--gc-font-display);
-    font-size: 27px;
-    font-weight: 900;
-    color: var(--gc-green);
-    letter-spacing: 4px;
-    text-shadow: 0 0 10px rgba(var(--gc-green-rgb), 0.85), 0 0 26px rgba(var(--gc-green-rgb), 0.6);
-    margin: 0;
-    text-transform: uppercase;
-    z-index: 2;
-    pointer-events: none;
-    line-height: 1;
-    animation: hero-neon-pulse 4s ease-in-out infinite alternate;
-}
-
-@keyframes hero-neon-pulse {
-    0% {
-        text-shadow: 0 0 10px rgba(var(--gc-green-rgb), 0.85), 0 0 24px rgba(var(--gc-green-rgb), 0.5);
-    }
-
-    100% {
-        text-shadow: 0 0 18px rgba(var(--gc-green-rgb), 1), 0 0 38px rgba(var(--gc-green-rgb), 0.8), 0 0 50px rgba(var(--gc-green-rgb), 0.4);
-    }
-}
-
-/* ── Launch Active State (Clean background cards fade, zero GPU canvas distortion) ── */
-body.is-game-launching .hero-brand-section.center-brand,
-.is-game-launching .hero-brand-section.center-brand,
-body.is-game-launching .cyber-brand-header,
-.is-game-launching .cyber-brand-header {
-    opacity: 0.15 !important;
-    pointer-events: none !important;
-    transition: opacity 0.3s ease !important;
-}
-
+/* ── Launch Active State ── */
 body.is-game-launching .player-stats-bar-modern,
 .is-game-launching .player-stats-bar-modern,
 body.is-game-launching .server-status-card,
 .is-game-launching .server-status-card,
 body.is-game-launching .server-status-card-modern,
 .is-game-launching .server-status-card-modern,
-body.is-game-launching .play-brand-group,
-.is-game-launching .play-brand-group,
-body.is-game-launching .play-btn-container,
-.is-game-launching .play-btn-container {
+body.is-game-launching .dashboard-launch-controls,
+.is-game-launching .dashboard-launch-controls {
     opacity: 0 !important;
     pointer-events: none !important;
     visibility: hidden !important;
@@ -617,12 +369,6 @@ body.is-game-launching .player-nametag-wrapper,
     visibility: hidden !important;
 }
 
-body.is-game-launching .sacred-leaf-wrapper,
-.is-game-launching .sacred-leaf-wrapper {
-    opacity: 0.1 !important;
-    transition: opacity 0.3s ease !important;
-}
-
 body.is-game-launching .launch-action-hub,
 .is-game-launching .launch-action-hub {
     opacity: 0 !important;
@@ -631,136 +377,31 @@ body.is-game-launching .launch-action-hub,
     transition: opacity 0.3s ease !important;
 }
 
-/* ── 3. Sacred Leaf Emblem (Right Column) ── */
-.play-brand-group {
-    display: none;
-    grid-column: 3;
-    grid-row: 1;
-    width: 100%;
-    max-width: 240px;
-    height: 100%;
+/* ── Bottom-Right Launch Section ── */
+.dashboard-launch-controls {
+    position: absolute;
+    right: 28px;
+    bottom: 24px;
+    z-index: 30;
+    display: flex;
+    justify-content: flex-end;
+    pointer-events: auto;
+}
+
+.dashboard-launch-controls .play-btn-container {
+    width: 240px;
     display: flex;
     flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 0;
-    box-sizing: border-box;
-    z-index: 20;
-    pointer-events: none;
-    transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.play-brand-group .sacred-leaf-wrapper {
-    width: 170px;
-    height: 170px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin: auto 0;
-    pointer-events: none !important;
-    cursor: default !important;
-    user-select: none !important;
-}
-
-.play-brand-group .sacred-geometry-leaf {
-    width: 100%;
-    height: 100%;
-    overflow: visible;
-    pointer-events: none !important;
-    cursor: default !important;
-}
-
-.play-brand-group .geometry-wireframe {
-    transform-origin: 100px 100px;
-    animation: sacred-grid-spin 60s linear infinite;
-    pointer-events: none !important;
-}
-
-@keyframes sacred-grid-spin {
-    0% {
-        transform: rotate(0deg);
-    }
-
-    100% {
-        transform: rotate(360deg);
-    }
-}
-
-.emblem-leaf-group,
-.cannabis-leaf-group {
-    animation: leaf-soft-breathe 4s ease-in-out infinite alternate;
-    transform-origin: 100px 100px;
-}
-
-@keyframes leaf-soft-breathe {
-    0% {
-        transform: scale(0.97);
-        filter: drop-shadow(0 0 10px rgba(var(--gc-green-rgb), 0.45));
-    }
-
-    100% {
-        transform: scale(1.03);
-        filter: drop-shadow(0 0 24px rgba(var(--gc-green-rgb), 0.95)) drop-shadow(0 0 38px rgba(0, 230, 118, 0.55));
-    }
-}
-
-/* Left 4 Dead Easter Egg fragments */
-.leaf-shard.shard-1,
-.leaf-severed-fragment {
-    animation: severed-fragment-drift 3.5s ease-in-out infinite alternate;
-    transform-origin: 160px 120px;
-}
-
-.leaf-shard.shard-2 {
-    animation: severed-fragment-drift 4s ease-in-out infinite alternate-reverse;
-    transform-origin: 175px 110px;
-}
-
-@keyframes severed-fragment-drift {
-    0% {
-        transform: translate(0, 0) rotate(0deg);
-    }
-
-    100% {
-        transform: translate(3px, -4px) rotate(8deg);
-    }
-}
-
-.torn-blade-group,
-.l4d-splatter-group {
-    animation: l4d-splatter-pulse 3s ease-in-out infinite alternate;
-}
-
-@keyframes l4d-splatter-pulse {
-    0% {
-        opacity: 0.75;
-    }
-
-    100% {
-        opacity: 1;
-        filter: drop-shadow(0 0 6px rgba(var(--gc-green-rgb), 0.8));
-    }
-}
-
-/* ── Centered Play Button Container ── */
-.play-btn-container {
-    width: 100%;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    gap: 12px;
-    height: 96px;
-    flex-shrink: 0;
-    margin-bottom: 2px;
+    align-items: stretch;
+    gap: 10px;
     pointer-events: auto;
     position: relative;
     z-index: 35;
 }
 
-/* Compact build picker next to Play, matching the classic launcher flow. */
-.build-selector-panel {
-    width: min(190px, 42%);
-    min-width: 142px;
+/* Build Profile Selector */
+.dashboard-launch-controls .build-selector-panel {
+    width: 100%;
     display: flex;
     flex-direction: column;
     align-items: stretch;
@@ -781,17 +422,17 @@ body.is-game-launching .launch-action-hub,
 
 .build-profile-select {
     width: 100%;
-    min-height: 34px;
-    padding: 0 30px 0 10px;
+    min-height: 36px;
+    padding: 0 30px 0 12px;
     appearance: auto;
     color: #f4fff1;
     background: rgba(8, 15, 11, 0.88);
     border: 1px solid rgba(57, 255, 20, 0.42);
-    border-radius: 4px;
+    border-radius: var(--gc-radius-sm, 6px);
     box-shadow: 0 0 14px rgba(57, 255, 20, 0.12), inset 0 0 0 1px rgba(0, 0, 0, 0.35);
     cursor: pointer;
     font-family: var(--gc-font-display, 'Outfit', sans-serif);
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 700;
     outline: none;
     transition: border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
@@ -825,321 +466,117 @@ body.is-game-launching .launch-action-hub,
     line-height: 1.15;
 }
 
-.magnetic-play-btn-circle.is-profile-required {
-    opacity: 0.48;
-    filter: saturate(0.55);
-    cursor: not-allowed;
-}
-
-.magnetic-play-btn-circle.is-profile-required:hover .play-btn-glow-ring {
-    opacity: 0.6;
-}
-
-@media (max-width: 720px) {
-    .play-btn-container {
-        gap: 8px;
-    }
-
-    .build-selector-panel {
-        min-width: 126px;
-    }
-
-    .build-profile-select {
-        font-size: 10px;
-    }
-}
-
-.play-btn-glow-ring {
-    position: absolute;
-    top: -8px;
-    left: -8px;
-    right: -8px;
-    bottom: -8px;
-    border-radius: var(--gc-radius-round);
-    background: radial-gradient(circle, rgba(var(--gc-green-rgb), 0.45) 0%, rgba(var(--gc-green-rgb), 0.12) 50%, transparent 75%);
-    animation: play-ring-pulse 3s ease-in-out infinite alternate;
-    pointer-events: none;
-}
-
-@keyframes play-ring-pulse {
-    0% {
-        transform: scale(0.96);
-        opacity: 0.5;
-        filter: blur(2px);
-    }
-
-    50% {
-        transform: scale(1.1);
-        opacity: 0.95;
-        filter: blur(5px);
-    }
-
-    100% {
-        transform: scale(0.96);
-        opacity: 0.5;
-        filter: blur(2px);
-    }
-}
-
-.main-dashboard-layout.has-players .launch-action-hub {
-    z-index: 15;
-}
-
-.magnetic-play-btn-circle {
-    position: relative;
-    z-index: 40;
-    width: 80px;
-    height: 80px;
-    border-radius: var(--gc-radius-round);
-    background: radial-gradient(circle at 40% 40%, #1e2930 0%, #0c1014 100%);
-    border: 2px solid var(--gc-green);
-    outline: none;
-    cursor: pointer;
-    overflow: visible;
+/* ── Streamlined Cyber Play Button (Under Selector) ── */
+.launcher-play-btn {
+    width: 100%;
+    height: 48px;
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow:
-        0 0 22px rgba(var(--gc-green-rgb), 0.5),
-        0 8px 20px rgba(0, 0, 0, 0.8),
-        inset 0 0 12px rgba(var(--gc-green-rgb), 0.22);
-    transition: box-shadow var(--gc-duration-normal) ease, filter var(--gc-duration-normal) ease, border-color var(--gc-duration-normal) ease;
-    will-change: transform;
-    margin: 0;
+    gap: 10px;
+    background: linear-gradient(135deg, rgba(57, 255, 20, 0.32) 0%, rgba(12, 38, 16, 0.94) 100%);
+    border: 1.5px solid var(--gc-green, #39ff14);
+    border-radius: var(--gc-radius-md, 8px);
+    color: #ffffff;
+    font-family: var(--gc-font-display, 'Outfit', sans-serif);
+    font-size: 15px;
+    font-weight: 800;
+    letter-spacing: 2.2px;
+    text-transform: uppercase;
+    cursor: pointer;
+    outline: none;
+    box-shadow: 0 0 20px rgba(57, 255, 20, 0.35), 0 6px 16px rgba(0, 0, 0, 0.6);
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
     user-select: none;
     -webkit-user-select: none;
-    pointer-events: auto !important;
+    position: relative;
+    overflow: hidden;
 }
 
-.magnetic-play-btn-circle:hover {
-    filter: brightness(1.15);
+.launcher-play-btn:hover:not(:disabled) {
+    background: linear-gradient(135deg, rgba(57, 255, 20, 0.48) 0%, rgba(18, 56, 24, 0.98) 100%);
     border-color: #84ff00;
-    box-shadow: 0 0 40px rgba(var(--gc-green-rgb), 0.9), 0 14px 30px rgba(0, 0, 0, 0.85), inset 0 0 18px rgba(var(--gc-green-rgb), 0.4);
+    box-shadow: 0 0 30px rgba(57, 255, 20, 0.75), 0 8px 22px rgba(0, 0, 0, 0.75);
+    transform: translateY(-2px);
+    filter: brightness(1.1);
 }
 
-.magnetic-play-btn-circle:active {
-    filter: brightness(0.95);
-    box-shadow: 0 0 20px rgba(var(--gc-green-rgb), 0.5), 0 4px 12px rgba(0, 0, 0, 0.9), inset 0 0 8px rgba(0, 0, 0, 0.6);
+.launcher-play-btn:active:not(:disabled) {
+    transform: translateY(1px);
+    box-shadow: 0 0 12px rgba(57, 255, 20, 0.4), 0 2px 6px rgba(0, 0, 0, 0.8);
 }
 
-.magnetic-play-btn-circle.is-cancelling-btn {
+.launcher-play-btn:disabled,
+.launcher-play-btn.is-profile-required {
+    opacity: 0.42;
+    cursor: not-allowed;
+    filter: grayscale(0.6);
+    border-color: rgba(57, 255, 20, 0.3);
+    box-shadow: none;
+    transform: none !important;
+}
+
+.launcher-play-btn .play-btn-icon {
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+    fill: currentColor;
+}
+
+.launcher-play-btn .play-btn-text {
+    line-height: 1;
+}
+
+/* Play Button: Cancel Mode */
+.launcher-play-btn.is-cancelling-btn {
+    background: linear-gradient(135deg, rgba(255, 77, 77, 0.35) 0%, rgba(42, 18, 21, 0.96) 100%) !important;
     border-color: #ff4d4d !important;
-    background: radial-gradient(circle at 40% 40%, #2a1215 0%, #14080a 100%) !important;
-    box-shadow: 0 0 26px rgba(255, 77, 77, 0.55), 0 10px 24px rgba(0, 0, 0, 0.8), inset 0 0 14px rgba(255, 77, 77, 0.25) !important;
+    box-shadow: 0 0 22px rgba(255, 77, 77, 0.45) !important;
+    color: #ffb4b4 !important;
 }
 
-.magnetic-play-btn-circle.is-cancelling-btn:hover {
-    filter: brightness(1.2);
-    border-color: #ff6b6b !important;
-    box-shadow: 0 0 40px rgba(255, 77, 77, 0.9), 0 14px 30px rgba(0, 0, 0, 0.85), inset 0 0 18px rgba(255, 77, 77, 0.4) !important;
+.launcher-play-btn.is-cancelling-btn:hover {
+    border-color: #ff7373 !important;
+    box-shadow: 0 0 32px rgba(255, 77, 77, 0.8) !important;
+    color: #ffffff !important;
 }
 
-.play-btn-glow-ring.cancel-glow {
-    background: radial-gradient(circle, rgba(255, 77, 77, 0.4) 0%, transparent 70%) !important;
+/* Play Button: Update Mode */
+.launcher-play-btn.is-update-btn {
+    background: linear-gradient(135deg, rgba(0, 229, 255, 0.32) 0%, rgba(8, 36, 48, 0.96) 100%) !important;
+    border-color: #00e5ff !important;
+    box-shadow: 0 0 22px rgba(0, 229, 255, 0.45) !important;
+    color: #bbf8ff !important;
 }
 
-.play-btn-cancel-icon {
-    position: relative;
-    z-index: 2;
-    width: 32px;
-    height: 32px;
-    filter: drop-shadow(0 0 8px rgba(255, 77, 77, 0.8));
-    pointer-events: none;
-}
-
-/* ── Update Mode for Play Button ── */
-.magnetic-play-btn-circle.is-update-btn {
-    border-color: var(--gc-cyan, #00e5ff) !important;
-    background: radial-gradient(circle at 40% 40%, #0d2738 0%, #06121c 100%) !important;
-    box-shadow:
-        0 0 28px rgba(0, 229, 255, 0.6),
-        0 10px 24px rgba(0, 0, 0, 0.8),
-        inset 0 0 14px rgba(0, 229, 255, 0.3) !important;
-}
-
-.magnetic-play-btn-circle.is-update-btn:hover {
-    filter: brightness(1.2);
+.launcher-play-btn.is-update-btn:hover {
     border-color: #64b5f6 !important;
-    box-shadow:
-        0 0 44px rgba(0, 229, 255, 0.95),
-        0 14px 30px rgba(0, 0, 0, 0.85),
-        inset 0 0 18px rgba(0, 229, 255, 0.5) !important;
+    box-shadow: 0 0 34px rgba(0, 229, 255, 0.8) !important;
+    color: #ffffff !important;
 }
 
-.magnetic-play-btn-circle.is-update-btn:active {
-    filter: brightness(0.95);
-    box-shadow:
-        0 0 20px rgba(0, 229, 255, 0.5),
-        0 4px 12px rgba(0, 0, 0, 0.9),
-        inset 0 0 8px rgba(0, 0, 0, 0.6) !important;
+.launcher-play-btn.is-update-btn.is-ready-to-install {
+    background: linear-gradient(135deg, rgba(57, 255, 20, 0.35) 0%, rgba(12, 42, 18, 0.96) 100%) !important;
+    border-color: #39ff14 !important;
+    box-shadow: 0 0 26px rgba(57, 255, 20, 0.5) !important;
+    color: #ffffff !important;
 }
 
-.magnetic-play-btn-circle.is-update-btn.is-ready-to-install {
-    border-color: var(--gc-green, #39ff14) !important;
-    background: radial-gradient(circle at 40% 40%, #15331a 0%, #08190c 100%) !important;
-    box-shadow:
-        0 0 32px rgba(57, 255, 20, 0.7),
-        0 10px 24px rgba(0, 0, 0, 0.8),
-        inset 0 0 14px rgba(57, 255, 20, 0.35) !important;
+.launcher-play-btn.is-downloading {
+    cursor: wait !important;
 }
 
-.magnetic-play-btn-circle.is-update-btn.is-ready-to-install:hover {
-    filter: brightness(1.2);
-    border-color: #84ff00 !important;
-    box-shadow:
-        0 0 48px rgba(57, 255, 20, 1),
-        0 14px 30px rgba(0, 0, 0, 0.85),
-        inset 0 0 20px rgba(57, 255, 20, 0.6) !important;
+.launcher-play-btn .play-btn-spinner {
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(255, 255, 255, 0.25);
+    border-top-color: #00e5ff;
+    border-radius: 50%;
+    animation: play-btn-spin 0.8s linear infinite;
 }
 
-.play-btn-glow-ring.update-glow {
-    background: radial-gradient(circle, rgba(0, 229, 255, 0.45) 0%, transparent 70%) !important;
-}
-
-.play-btn-glow-ring.update-glow.ready-glow {
-    background: radial-gradient(circle, rgba(57, 255, 20, 0.5) 0%, transparent 70%) !important;
-}
-
-.play-btn-glow-ring.pulse-fast {
-    animation: play-ring-pulse-fast 1.2s ease-in-out infinite alternate !important;
-}
-
-@keyframes play-ring-pulse-fast {
-    0% {
-        transform: scale(0.94);
-        opacity: 0.4;
-        filter: blur(2px);
-    }
-
-    100% {
-        transform: scale(1.14);
-        opacity: 1;
-        filter: blur(6px);
-    }
-}
-
-.play-btn-update-icon {
-    position: relative;
-    z-index: 2;
-    width: 32px;
-    height: 32px;
-    filter: drop-shadow(0 0 8px rgba(0, 229, 255, 0.85));
-    pointer-events: none;
-}
-
-.play-btn-update-icon.ready-icon {
-    width: 34px;
-    height: 34px;
-    filter: drop-shadow(0 0 10px rgba(57, 255, 20, 0.95));
-}
-
-/* ── Circular Progress SVG & Percentage Display ── */
-.play-btn-progress-svg {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    pointer-events: none;
-    z-index: 3;
-}
-
-.play-btn-progress-svg .progress-bg {
-    stroke: rgba(0, 229, 255, 0.18);
-    stroke-width: 4.5px;
-}
-
-.play-btn-progress-svg .progress-bar-circle {
-    stroke: var(--gc-cyan, #00e5ff);
-    stroke-width: 4.5px;
-    stroke-linecap: round;
-    transition: stroke-dashoffset 0.28s cubic-bezier(0.4, 0, 0.2, 1);
-    filter: drop-shadow(0 0 8px rgba(0, 229, 255, 0.95));
-}
-
-.play-btn-progress-svg .progress-bar-circle.completed {
-    stroke: var(--gc-green, #39ff14);
-    stroke-width: 4.5px;
-    filter: drop-shadow(0 0 10px rgba(57, 255, 20, 0.95));
-}
-
-.play-btn-percent-text {
-    position: relative;
-    z-index: 4;
-    font-family: 'JetBrains Mono', 'Outfit', monospace;
-    font-size: 21px;
-    font-weight: 800;
-    color: #ffffff;
-    letter-spacing: -0.5px;
-    text-shadow:
-        0 0 12px rgba(0, 229, 255, 0.95),
-        0 0 24px rgba(0, 229, 255, 0.6);
-    display: flex;
-    align-items: baseline;
-    justify-content: center;
-    pointer-events: none;
-    user-select: none;
-}
-
-.play-btn-percent-text .percent-sign {
-    font-size: 11px;
-    font-weight: 700;
-    margin-left: 2px;
-    color: var(--gc-cyan, #00e5ff);
-    opacity: 0.95;
-    text-shadow: 0 0 8px rgba(0, 229, 255, 0.9);
-}
-
-.play-btn-glow-ring {
-    position: absolute;
-    top: -6px;
-    left: -6px;
-    right: -6px;
-    bottom: -6px;
-    border-radius: var(--gc-radius-round);
-    background: radial-gradient(circle, rgba(var(--gc-green-rgb), 0.35) 0%, transparent 70%);
-    opacity: 0.6;
-    transition: opacity 0.3s ease;
-    pointer-events: none;
-}
-
-.magnetic-play-btn-circle:hover .play-btn-glow-ring {
-    opacity: 1;
-}
-
-.play-btn-triangle-icon {
-    position: relative;
-    z-index: 2;
-    width: 28px;
-    height: 28px;
-    margin-left: 3px;
-    fill: var(--gc-text-white);
-    filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.6));
-    pointer-events: none;
-}
-
-/* Right-bottom build selector and launch action. */
-.dashboard-launch-controls {
-    position: absolute;
-    right: 28px;
-    bottom: 26px;
-    z-index: 30;
-    display: flex;
-    justify-content: flex-end;
-    pointer-events: auto;
-}
-
-.dashboard-launch-controls .play-btn-container {
-    align-items: flex-end;
-    gap: 12px;
-}
-
-.dashboard-launch-controls .build-selector-panel {
-    min-width: 190px;
-}
-
-.dashboard-launch-controls .magnetic-play-btn-circle {
-    flex: 0 0 auto;
+@keyframes play-btn-spin {
+    to { transform: rotate(360deg); }
 }
 
 /* ── 4. Right: Server Status Hub (Pinned to Top Right) ── */

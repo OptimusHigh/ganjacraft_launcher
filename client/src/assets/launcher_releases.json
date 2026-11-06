@@ -4,11 +4,11 @@
     "date": "2026-09-03T11:08:27.454Z",
     "timestamp": 1788433707,
     "title": "Релиз v1.0.187",
-    "description": "Переработка экрана настроек, обновление клиентских модов и облегчение логики мини игры при запуске майнкрафта.",
+    "description": "Переработка экрана настроек и обновление клиентских модов.",
     "changes": [
       "✨ Implement modular settings architecture with adaptive layout, performance utilities, and easter egg module",
       "✨ Implement centralized configuration management and a modularized mods-manager system",
-      "✨ Implement easter egg features including a terminal-style RCON console, particle popping minigame, and meme webcam overlay.",
+      "✨ Implement easter egg features including a terminal-style RCON console and meme webcam overlay.",
       "✨ Implement mod management system with group support and dependency handling",
       "✨ Implement mod management system with categorization, toggle dependencies, and custom UI",
       "✨ Implement authentication, constants, and module structures for renderer features",
@@ -84,7 +84,7 @@
     "date": "2026-08-30T10:17:36.579Z",
     "timestamp": 1788085056,
     "title": "Релиз v1.0.182",
-    "description": "Новый раздел - обновления. Редизайн главного экрана, мини-игра при загрузке.",
+    "description": "Новый раздел - обновления. Редизайн главного экрана.",
     "changes": [
       "✨ Heroic wide combat stance for legs",
       "✨ Expand render area to 480x400 and adjust zoom for long weapon barrels",

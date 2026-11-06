@@ -6,6 +6,7 @@
 import { dom } from '../../utils/dom.js';
 import { FILES_BASE } from '../../constants.js';
 import { MOD_GROUPS, CATEGORY_ORDER } from './mod-groups.js';
+import { isClientMod } from '../changelog/changelog-manager.js';
 
 let cachedManifest = null;
 let cachedManifestProfileId = null;
@@ -38,11 +39,6 @@ function getManifestFileKind(file) {
     return 'mod';
 }
 
-function isRegularModFile(file) {
-    const normalizedPath = normalizeManifestPath(file?.path).toLowerCase();
-    return normalizedPath.startsWith('mods/') && getManifestFileKind(file) === 'mod';
-}
-
 function getModFileName(filePath) {
     return normalizeManifestPath(filePath).split('/').pop() || '';
 }
@@ -52,8 +48,60 @@ function getModStem(filePath) {
     const fileName = filePath.split('/').pop().split('\\').pop().toLowerCase();
     return fileName
         .replace(/\.jar$/i, '')
+        .replace(/\.zip$/i, '')
         .replace(/[-_](v?\d+\.[\d.]+.*)$/i, '')
         .replace(/[-_](neoforge|forge|fabric|mc\d+.*)$/i, '');
+}
+
+function fileMatchesPattern(filePath, pattern) {
+    const norm = normalizeManifestPath(filePath).toLowerCase();
+    const fileName = norm.split('/').pop();
+    const p = pattern.toLowerCase();
+
+    const matches = fileName.includes(p) || norm.includes(p);
+    if (!matches) return false;
+
+    // Collision exclusions to prevent overlapping patterns
+    if (p === 'sodium' && (fileName.includes('sodium-extra') || fileName.includes('sodium_extra') || fileName.includes('reeses'))) return false;
+    if (p === 'entity_texture_features' && (fileName.includes('entity_model_features') || fileName.includes('entity_sound_features'))) return false;
+    if (p === 'etf' && (fileName.includes('emf') || fileName.includes('esf'))) return false;
+    if (p === 'litematica' && (fileName.includes('printer') || fileName.includes('malilib'))) return false;
+    if (p === 'forgematica' && (fileName.includes('printer') || fileName.includes('mafglib') || fileName.includes('badpackets'))) return false;
+    if (p === 'freshanimations' && (fileName.includes('fa+all') || fileName.includes('fa+player'))) return false;
+    if (p === 'armory reforged' && (fileName.includes('reforged tools') || fileName.includes('hardware reforged') || fileName.includes('health bars'))) return false;
+    if (p === 'armoryreforged' && (fileName.includes('reforgedtools') || fileName.includes('hardwarereforged') || fileName.includes('healthbars'))) return false;
+    if (p === 'visualenchantments' && (fileName.includes('armor_trims') || fileName.includes('armortrims') || fileName.includes('enchant icons') || fileName.includes('enchanticons') || fileName.includes('xali'))) return false;
+    if (p === 'visual_enchantments' && (fileName.includes('armor_trims') || fileName.includes('enchant icons') || fileName.includes('xali'))) return false;
+    if (p === 'controlling' && fileName.includes('searchables')) return false;
+    if ((p === 'emi' || p === 'semi') && (fileName.includes('createjeicompat') || fileName.includes('jei') || fileName.includes('jer'))) return false;
+    if (p === 'jei' && (fileName.includes('justenoughresources') || fileName.includes('jer'))) return false;
+    if (p.includes('fancy') && fileName.includes('fast')) return false;
+    if (p.includes('fast') && fileName.includes('fancy')) return false;
+
+    return true;
+}
+
+function isCandidateOptionalFile(file) {
+    if (!file || typeof file.path !== 'string') return false;
+    const norm = normalizeManifestPath(file.path).toLowerCase();
+
+    // Ignore helper/metadata files that are handled with parent packs
+    if (norm.endsWith('.pw.toml') || norm.endsWith('.zip.txt') || norm.endsWith('.disabled')) return false;
+
+    if (file.optional === true) return true;
+
+    if (norm.startsWith('client_mods/') || norm.startsWith('resourcepacks/') || norm.startsWith('shaderpacks/')) {
+        return true;
+    }
+
+    if (norm.startsWith('mods/')) {
+        if (norm.startsWith('mods/client-') || norm.startsWith('mods/client_')) return true;
+        const fileName = norm.split('/').pop();
+        if (isClientMod(fileName)) return true;
+        if (MOD_GROUPS.some(g => g.files && g.files.some(p => fileMatchesPattern(fileName, p)))) return true;
+    }
+
+    return false;
 }
 
 const LEGACY_GROUP_ALIASES = {
@@ -101,7 +149,7 @@ function isModDisabled(filePath, disabledMods = []) {
  * Загрузить список модов
  */
 export async function loadModsList(disabledMods = [], config = {}, forceReload = false) {
-    const profileId = config.activeProfileId || window.__activeBuildProfileId || '';
+    const profileId = config.activeProfileId || window.__activeBuildProfileId || 'ganj4craft5';
     const profileChanged = cachedManifestProfileId !== profileId;
     if (!profileId) {
         cachedManifest = null;
@@ -148,34 +196,32 @@ export async function loadModsList(disabledMods = [], config = {}, forceReload =
     }
 
     const manifestFiles = Array.isArray(cachedManifest.files) ? cachedManifest.files : [];
-    const allFiles = manifestFiles.filter(file => {
-        if (!file || !file.optional || typeof file.path !== 'string') return false;
-        const normalizedPath = normalizeManifestPath(file.path).toLowerCase();
-        return (
-            (normalizedPath.startsWith('mods/') || normalizedPath.startsWith('client_mods/')) &&
-            /\.(jar|zip)$/.test(normalizedPath)
-        ) || (
-                normalizedPath.startsWith('resourcepacks/') &&
-                /\.(zip|mcpack)$/.test(normalizedPath)
-            ) || (
-                normalizedPath.startsWith('shaderpacks/') &&
-                /\.(zip|jar)$/.test(normalizedPath)
-            );
-    });
+    const allFiles = manifestFiles.filter(file => isCandidateOptionalFile(file));
 
     allGroupItems = [];
     const handledFiles = new Set();
 
-    // Обрабатываем группы
+    // 1. Обрабатываем структурированные группы модов и ресурспаков
     MOD_GROUPS.forEach(group => {
         const groupFiles = allFiles.filter(f => {
-            if (!isRegularModFile(f)) return false;
-            const fileName = getModFileName(f.path).toLowerCase();
-            return group.files.some(pattern => fileName.includes(pattern.toLowerCase()));
+            return group.files.some(pattern => fileMatchesPattern(f.path, pattern));
         });
 
         if (groupFiles.length > 0) {
             groupFiles.forEach(f => handledFiles.add(f.path));
+
+            // Захватываем сопутствующие вспомогательные файлы (например, .pw.toml или .zip.txt для шейдеров)
+            const extraPaths = [];
+            groupFiles.forEach(f => {
+                const normPath = normalizeManifestPath(f.path);
+                manifestFiles.forEach(mf => {
+                    const mfNorm = normalizeManifestPath(mf.path);
+                    if (mfNorm !== normPath && (mfNorm.startsWith(normPath + '.') || (normPath.endsWith('.zip') && mfNorm === normPath.replace(/\.zip$/i, '.pw.toml')))) {
+                        handledFiles.add(mf.path);
+                        extraPaths.push(mfNorm);
+                    }
+                });
+            });
 
             let isChecked;
             if ((config.modsDefaultsApplied !== true || config.modsDefaultsVersion !== 2) && group.defaultDisabled) {
@@ -183,6 +229,8 @@ export async function loadModsList(disabledMods = [], config = {}, forceReload =
             } else {
                 isChecked = groupFiles.every(f => !isModDisabled(f.path, disabledMods));
             }
+
+            const allGroupPaths = [...groupFiles.map(f => normalizeManifestPath(f.path)), ...extraPaths];
 
             allGroupItems.push({
                 type: 'group',
@@ -196,13 +244,13 @@ export async function loadModsList(disabledMods = [], config = {}, forceReload =
                 description: group.description,
                 curseSlug: group.curseSlug,
                 modrinthSlug: group.modrinthSlug,
-                paths: groupFiles.map(f => normalizeManifestPath(f.path)),
+                paths: allGroupPaths,
                 checked: isChecked
             });
         }
     });
 
-    // Обрабатываем оставшиеся единичные файлы
+    // 2. Обрабатываем оставшиеся файлы (индивидуальные моды, ресурспаки, шейдеры)
     const remainingFiles = allFiles.filter(f => !handledFiles.has(f.path));
     remainingFiles.forEach(file => {
         const isChecked = !isModDisabled(file.path, disabledMods);
@@ -213,15 +261,15 @@ export async function loadModsList(disabledMods = [], config = {}, forceReload =
             ? 'Ресурспаки'
             : kind === 'shader'
                 ? 'Шейдеры'
-                : kind === 'client_mod'
-                    ? 'Клиентские моды'
-                    : null;
+                : 'Остальное';
 
         let prettyName = file.displayName || fileName
-            .replace(/\.jar$/i, '')
+            .replace(/\.(jar|zip|mcpack)$/i, '')
             .replace(/^client[-_]/i, '')
             .replace(/[-_](neoforge|forge|fabric|mc|\d+\.\d+).*/i, '')
-            .replace(/[-_]\d+.*$/i, '');
+            .replace(/[-_]\d+.*$/i, '')
+            .replace(/[_-]+/g, ' ')
+            .trim();
         prettyName = prettyName.charAt(0).toUpperCase() + prettyName.slice(1);
 
         const slug = prettyName.toLowerCase().replace(/[^a-z0-9]+/g, '-');
@@ -233,11 +281,11 @@ export async function loadModsList(disabledMods = [], config = {}, forceReload =
             shortName: prettyName,
             version: file.version || '1.0.0',
             kind,
-            badge: specialSection || 'Опциональный',
-            subCategory: specialSection || file.category || 'Остальное',
-            icon: 'block',
+            badge: specialSection,
+            subCategory: specialSection,
+            icon: kind === 'resourcepack' ? 'brush' : kind === 'shader' ? 'brush' : 'block',
             dependsOn: null,
-            description: `${specialSection || 'Дополнительный мод'} (${fileName})`,
+            description: `${specialSection} (${fileName})`,
             curseSlug: slug,
             modrinthSlug: slug,
             paths: [normalizeManifestPath(file.path)],
@@ -345,6 +393,12 @@ function getModItemSVG(iconType) {
             return `<svg class="setting-icon" style="color: #7e57c2;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`;
         case 'blueprint':
             return `<svg class="setting-icon" style="color: #26c6da;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16.5 9.4 7.55 4.24a1.48 1.48 0 0 0-1.55 0L3 6"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.29 7 12 12 20.71 7"/><line x1="12" x2="12" y1="22" y2="12"/></svg>`;
+        case 'sound':
+            return `<svg class="setting-icon" style="color: #ffb74d;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>`;
+        case 'heart':
+            return `<svg class="setting-icon" style="color: #ef5350;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg>`;
+        case 'swords':
+            return `<svg class="setting-icon" style="color: #e57373;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="14.5 17.5 3 6 3 3 6 3 17.5 14.5"/><line x1="13" y1="19" x2="19" y2="13"/><line x1="16" y1="16" x2="20" y2="20"/><line x1="19" y1="21" x2="21" y2="19"/></svg>`;
         case 'gear':
         default:
             return `<svg class="setting-icon" style="color: #a1a8b5;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/></svg>`;
@@ -358,9 +412,12 @@ function getCategoryIconId(catName) {
     switch (catName.toUpperCase()) {
         case 'ОПТИМИЗАЦИЯ': return '#icon-game';
         case 'ГРАФИКА': return '#icon-appearance';
-        case 'ИНТЕРФЕЙС': return '#icon-wrench';
+        case 'КАМЕРА И УПРАВЛЕНИЕ':
         case 'КАМЕРА': return '#icon-hide';
         case 'СТРОИТЕЛЬСТВО': return '#icon-folder';
+        case 'ИНТЕРФЕЙС': return '#icon-wrench';
+        case 'РЕСУРСПАКИ': return '#icon-appearance';
+        case 'ШЕЙДЕРЫ': return '#icon-smoke';
         default: return '#icon-game';
     }
 }
@@ -557,7 +614,14 @@ export function renderModsGrid() {
         categoryCard.appendChild(content);
 
         const upperCat = catName.toUpperCase();
-        if (upperCat === 'ОПТИМИЗАЦИЯ' || upperCat === 'ГРАФИКА') {
+        const leftCategories = new Set([
+            'ОПТИМИЗАЦИЯ',
+            'ГРАФИКА',
+            'КАМЕРА И УПРАВЛЕНИЕ',
+            'КАМЕРА',
+            'СТРОИТЕЛЬСТВО'
+        ]);
+        if (leftCategories.has(upperCat)) {
             colLeft.appendChild(categoryCard);
         } else {
             colRight.appendChild(categoryCard);
