@@ -1509,7 +1509,11 @@ async function launchGame(event, options) {
 
             // Switch Discord RPC back to Launcher status
             try {
-                discordRpc.setLauncherActivity({ username: authSession?.name || options?.username });
+                discordRpc.setLauncherActivity({
+                    username: authSession?.name || options?.username,
+                    profileId: profile.id,
+                    force: true
+                });
             } catch (_) { }
 
             if (logStream) logStream.end();
@@ -1537,6 +1541,7 @@ async function launchGame(event, options) {
                     try {
                         discordRpc.setGameActivity({
                             username: authSession?.name || options?.username,
+                            profileId: profile.id,
                             startTime: Math.floor(Date.now() / 1000)
                         });
                     } catch (_) { }

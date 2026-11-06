@@ -46,7 +46,10 @@ if (!gotTheLock) {
         // Initialize Discord Rich Presence
         try {
             const config = loadConfig();
-            discordRpc.init({ enabled: config.enableDiscordRpc !== false });
+            discordRpc.init({
+                enabled: config.enableDiscordRpc !== false,
+                profileId: config.activeProfileId
+            });
         } catch (e) {
             console.warn('[MAIN] Failed to init Discord RPC:', e.message);
         }

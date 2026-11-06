@@ -626,6 +626,22 @@ export function switchTab(targetTabId) {
     // Синхронизация кнопок ⚙️ и 🔔 в заголовке
     updateHeaderControlsForTab(targetTabId);
 
+    try {
+        const tabNames = {
+            general: 'Настройки',
+            mods: 'Моды',
+            configs: 'Конфиги',
+            changelog: 'Обновления'
+        };
+        const viewName = tabNames[targetTabId] || 'Настройки';
+        const user = localStorage.getItem('auth_user') || '';
+        window.api?.updateDiscordActivity?.({
+            username: user,
+            profileId: window.__activeBuildProfileId,
+            viewName
+        });
+    } catch (_) {}
+
     if (settingsBody) settingsBody.classList.add('animating');
 
     allTabs.forEach(t => {

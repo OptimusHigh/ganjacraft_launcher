@@ -23,6 +23,14 @@ const BUILD_PROFILES = {
         serverHost: 'vocalize-cove.gl.joinmc.link',
         serverPort: 25565,
         directoryName: 'vanilla',
+        discord: {
+            serverName: 'Vanilla',
+            details: 'Играет на сервере Vanilla',
+            largeImage: 'https://launcher.ganj4craft.ru/files/icons/grass_block.png',
+            largeText: 'GanjaCraft Vanilla (Fabric 26.3)',
+            smallImage: 'mclogonew',
+            smallText: 'Minecraft 26.3 • Fabric'
+        }
     },
     ganj4craft5: {
         id: 'ganj4craft5',
@@ -37,10 +45,19 @@ const BUILD_PROFILES = {
         serverHost: 'vocalize-cove.gl.joinmc.link',
         serverPort: 25578,
         directoryName: 'ganj4craft5',
+        discord: {
+            serverName: 'ThaumParty',
+            details: 'Играет на сервере ThaumParty',
+            largeImage: 'https://launcher.ganj4craft.ru/files/icons/thaumonomicon.png',
+            largeText: 'ThaumParty (NeoForge 26.1.2)',
+            smallImage: 'mclogonew',
+            smallText: 'Minecraft 26.1.2 • NeoForge'
+        }
     },
 };
 
 function getBuildProfile(profileId) {
+    if (profileId === 'minecraft-vanilla') return BUILD_PROFILES.vanilla;
     return BUILD_PROFILES[profileId] || BUILD_PROFILES.ganj4craft5;
 }
 

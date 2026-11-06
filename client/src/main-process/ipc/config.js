@@ -47,7 +47,13 @@ function registerConfigHandlers(mainWindow) {
         const profile = getProfileConfig(config, profileId);
         config.activeProfileId = profile.id;
         config.installPath = config.profiles[profile.id].installPath;
-        return saveConfig(config) ? profile : null;
+        const saved = saveConfig(config) ? profile : null;
+        if (saved) {
+            try {
+                discordRpc.setLauncherActivity({ profileId: profile.id });
+            } catch (_) {}
+        }
+        return saved;
     });
 
     // Get game configs

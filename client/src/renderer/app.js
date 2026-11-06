@@ -184,7 +184,11 @@ function initSettingsButton() {
             // Открываем панель на вкладке 'general'
             openSettings('general');
             try {
-                window.api.updateDiscordActivity({ username: getCurrentUsername(), viewName: 'Настройки' });
+                window.api.updateDiscordActivity({
+                    username: getCurrentUsername(),
+                    profileId: window.__activeBuildProfileId || currentConfig.activeProfileId,
+                    viewName: 'Настройки'
+                });
             } catch (_) { }
 
             // Hide easter egg after animation if active
@@ -206,7 +210,11 @@ function initSettingsButton() {
             closeSettings();
             cancelPendingConfigs();
             try {
-                window.api.updateDiscordActivity({ username: getCurrentUsername(), viewName: 'Главное меню' });
+                window.api.updateDiscordActivity({
+                    username: getCurrentUsername(),
+                    profileId: window.__activeBuildProfileId || currentConfig.activeProfileId,
+                    viewName: 'Главное меню'
+                });
             } catch (_) { }
 
             const saveBtn = dom.get('save-settings');
@@ -319,7 +327,11 @@ async function init() {
     try {
         const username = getCurrentUsername();
         if (username) {
-            window.api.updateDiscordActivity({ username, viewName: 'Главное меню' });
+            window.api.updateDiscordActivity({
+                username,
+                profileId: window.__activeBuildProfileId || currentConfig.activeProfileId,
+                viewName: 'Главное меню'
+            });
         }
     } catch (_) { }
 
@@ -373,6 +385,13 @@ async function init() {
             captureInitialSettingsState();
             await loadModsList(profileConfig.disabledMods || [], currentConfig, true);
             await loadConfigsList(profileId);
+            try {
+                window.api.updateDiscordActivity({
+                    username: getCurrentUsername(),
+                    profileId,
+                    viewName: 'Главное меню'
+                });
+            } catch (_) { }
         } catch (error) {
             console.error('[Profile] Failed to reload profile data:', error);
         } finally {

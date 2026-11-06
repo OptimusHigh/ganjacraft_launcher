@@ -7,7 +7,7 @@ const net = require('net');
 const path = require('path');
 const os = require('os');
 const crypto = require('crypto');
-const { DISCORD_CLIENT_ID, SITE_URL, CLIENT_VERSION, MC_VERSION } = require('../constants');
+const { DISCORD_CLIENT_ID, SITE_URL, CLIENT_VERSION, BUILD_PROFILES, getBuildProfile } = require('../constants');
 
 // Opcodes Discord IPC
 const OPCODES = {
@@ -32,6 +32,8 @@ class DiscordRpcManager {
         this.inGame = false;
         this.gameStartTime = null;
         this.currentUsername = null;
+        this.currentProfileId = 'ganj4craft5';
+        this.lastViewName = 'Главное меню';
     }
 
     /**
@@ -66,6 +68,12 @@ class DiscordRpcManager {
         }
         if (options.clientId) {
             this.clientId = options.clientId;
+        }
+        if (options.profileId) {
+            this.currentProfileId = options.profileId;
+        }
+        if (options.username) {
+            this.currentUsername = options.username;
         }
 
         if (!this.isEnabled) {
@@ -166,8 +174,18 @@ class DiscordRpcManager {
                 this.isHandshaked = true;
                 if (this.currentActivity) {
                     this.sendActivity(this.currentActivity);
+                } else if (this.inGame) {
+                    this.setGameActivity({
+                        username: this.currentUsername,
+                        profileId: this.currentProfileId,
+                        startTime: this.gameStartTime
+                    });
                 } else {
-                    this.setLauncherActivity();
+                    this.setLauncherActivity({
+                        username: this.currentUsername,
+                        profileId: this.currentProfileId,
+                        viewName: this.lastViewName
+                    });
                 }
             } else if (data && data.evt === 'ERROR') {
                 console.warn('[DISCORD RPC] Error event from Discord:', data.data?.message);
@@ -233,26 +251,67 @@ class DiscordRpcManager {
     }
 
     /**
+     * Определение активного профиля сборки
+     */
+    resolveProfile(profileId) {
+        if (profileId) {
+            this.currentProfileId = profileId;
+        } else if (!this.currentProfileId) {
+            try {
+                const { loadConfig } = require('../../modules/config');
+                const cfg = loadConfig();
+                if (cfg && cfg.activeProfileId) {
+                    this.currentProfileId = cfg.activeProfileId;
+                }
+            } catch (_) {}
+        }
+        return getBuildProfile(this.currentProfileId);
+    }
+
+    /**
      * Установка статуса «В лаунчере»
      */
     setLauncherActivity(params = {}) {
+        // Если игра запущена и не передан принудительный флаг возврата, не перебиваем статус игры
+        if (this.inGame && !params.force) {
+            return;
+        }
         this.inGame = false;
         this.gameStartTime = null;
+
         if (params.username) this.currentUsername = params.username;
+        if (params.viewName) this.lastViewName = params.viewName;
+        if (params.profileId) this.currentProfileId = params.profileId;
+
+        const profile = this.resolveProfile(params.profileId);
+        const profileName = profile.shortName || profile.name || 'Ganj4Craft';
+        const loaderLabel = profile.loader === 'fabric' ? 'Fabric' : 'NeoForge';
+        const versionLabel = `${loaderLabel} ${profile.minecraftVersion || ''}`.trim();
 
         const siteUrl = SITE_URL || 'https://ganj4craft.ru';
         const downloadUrl = `${siteUrl}/launcher.html`;
-        const view = params.viewName || 'Главное меню';
-        const userState = this.currentUsername ? `Игрок: ${this.currentUsername}` : `Ganj4Craft Season 4`;
+        const view = params.viewName || this.lastViewName || 'Главное меню';
+
+        const userState = this.currentUsername
+            ? `Игрок: ${this.currentUsername} • ${profileName}`
+            : `Сборка: ${profileName}`;
+
+        const profileIcon = profile.id === 'vanilla'
+            ? 'https://launcher.ganj4craft.ru/files/icons/grass_block.png'
+            : 'https://launcher.ganj4craft.ru/files/icons/thaumonomicon.png';
+
+        const largeImage = 'mclogonew';
+        const smallImage = profileIcon;
+        const smallText = `${profile.name} (${versionLabel})`;
 
         const activity = {
             details: `В лаунчере (${view})`,
             state: userState,
             assets: {
-                large_image: 'logo',
+                large_image: largeImage,
                 large_text: `Ganj4Craft Launcher v${CLIENT_VERSION}`,
-                small_image: 'icon',
-                small_text: `Minecraft ${MC_VERSION}`
+                small_image: smallImage,
+                small_text: smallText
             },
             buttons: [
                 { label: '🌐 Наш сайт', url: siteUrl },
@@ -269,25 +328,41 @@ class DiscordRpcManager {
     setGameActivity(params = {}) {
         this.inGame = true;
         if (params.username) this.currentUsername = params.username;
+        if (params.profileId) this.currentProfileId = params.profileId;
         if (!this.gameStartTime || params.resetTimer) {
             this.gameStartTime = params.startTime || Math.floor(Date.now() / 1000);
         }
+
+        const profile = this.resolveProfile(params.profileId);
+        const profileName = profile.shortName || profile.name || 'Ganj4Craft';
+        const loaderLabel = profile.loader === 'fabric' ? 'Fabric' : 'NeoForge';
+        const versionLabel = `${loaderLabel} ${profile.minecraftVersion || ''}`.trim();
 
         const siteUrl = SITE_URL || 'https://ganj4craft.ru';
         const downloadUrl = `${siteUrl}/launcher.html`;
         const username = this.currentUsername || 'Игрок';
 
+        const serverTitle = profile.discord?.serverName || profileName;
+        const detailsText = profile.discord?.details || `Играет на сервере ${serverTitle}`;
+        const defaultProfileIcon = profile.id === 'vanilla'
+            ? 'https://launcher.ganj4craft.ru/files/icons/grass_block.png'
+            : 'https://launcher.ganj4craft.ru/files/icons/thaumonomicon.png';
+        const largeImage = profile.discord?.largeImage || defaultProfileIcon;
+        const largeText = profile.discord?.largeText || `${profile.name} (${versionLabel})`;
+        const smallImage = profile.discord?.smallImage || 'mclogonew';
+        const smallText = profile.discord?.smallText || `${username} • ${versionLabel}`;
+
         const activity = {
-            details: `Играет на Ganj4Craft Season 4`,
+            details: detailsText,
             state: `Ник: ${username}`,
             timestamps: {
                 start: this.gameStartTime
             },
             assets: {
-                large_image: 'logo',
-                large_text: `NeoForge ${MC_VERSION}`,
-                small_image: 'icon',
-                small_text: username
+                large_image: largeImage,
+                large_text: largeText,
+                small_image: smallImage,
+                small_text: smallText
             },
             buttons: [
                 { label: '🌐 Наш сайт', url: siteUrl },

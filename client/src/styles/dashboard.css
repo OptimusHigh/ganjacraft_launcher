@@ -708,6 +708,22 @@ body.is-game-launching .launch-action-hub,
     gap: 6px;
 }
 
+.server-spoiler-icon {
+    width: 18px;
+    height: 18px;
+    object-fit: contain;
+    image-rendering: pixelated;
+    display: inline-block;
+    vertical-align: middle;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5));
+    flex-shrink: 0;
+    transition: transform 0.15s ease;
+}
+
+.server-spoiler-card:hover .server-spoiler-icon {
+    transform: scale(1.1);
+}
+
 .server-status-title {
     font-family: var(--gc-font-minecraft, 'Minecraft', monospace);
     font-size: 14px;
