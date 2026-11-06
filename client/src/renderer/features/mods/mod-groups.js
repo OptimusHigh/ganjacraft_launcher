@@ -525,6 +525,7 @@ export const MOD_GROUPS = [
         category: 'Строительство',
         subCategory: 'Строительство',
         icon: 'blueprint',
+        dependsOn: 'malilib',
         description: 'Загрузка 3D-схематик постройки, полупрозрачная проекция и сверка блоков.',
         curseSlug: 'forgematica',
         modrinthSlug: 'forgematica',
@@ -551,13 +552,12 @@ export const MOD_GROUPS = [
         name: 'MaLiLib',
         shortName: 'MaLiLib Core',
         version: '0.30.2',
-        category: 'Строительство',
-        subCategory: 'Строительство',
+        category: 'Интерфейс',
+        subCategory: 'Интерфейс',
         icon: 'gear',
-        dependsOn: 'litematica',
         description: 'Базовая служебная библиотека настроек для модов Litematica и MiniHUD.',
         files: ['malilib', 'mafglib', 'badpackets'],
-        defaultDisabled: true
+        defaultDisabled: false
     },
 
     // ----------------------------------------------------
@@ -701,9 +701,10 @@ export const MOD_GROUPS = [
         category: 'Интерфейс',
         subCategory: 'Интерфейс',
         icon: 'monitor',
+        dependsOn: 'malilib',
         description: 'Настраиваемый оверлей координат, FPS, света, времени суток и биома на экране.',
         files: ['minihud'],
-        defaultDisabled: true
+        defaultDisabled: false
     },
     {
         id: 'modmenu',

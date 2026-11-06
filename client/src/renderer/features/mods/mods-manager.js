@@ -114,9 +114,18 @@ const LEGACY_GROUP_ALIASES = {
 function isModDisabled(filePath, disabledMods = []) {
     if (!filePath || !Array.isArray(disabledMods) || disabledMods.length === 0) return false;
     const normPath = normalizeManifestPath(filePath);
+    const targetFileName = normPath.split('/').pop().toLowerCase();
+
+    // Защита MaLiLib: не отключать, если MiniHUD не отключен
+    if (targetFileName.includes('malilib')) {
+        const isMiniHudDisabled = disabledMods.some(d => String(d).toLowerCase().includes('minihud'));
+        if (!isMiniHudDisabled) {
+            return false;
+        }
+    }
+
     if (disabledMods.includes(normPath)) return true;
 
-    const targetFileName = normPath.split('/').pop().toLowerCase();
     const targetStem = getModStem(normPath);
 
     for (const disabledEntry of disabledMods) {
