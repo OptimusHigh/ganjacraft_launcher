@@ -138,35 +138,99 @@ function getLatestCompoundId() {
     return `${pId}_${lId}_${nId}`;
 }
 
+let currentChangelogFilter = 'all';
+
 /**
- * Загрузить историю изменений манифеста, релизов лаунчера и новостей
+ * Установить фильтр ленты чейнджлога ('all', 'ganj4craft5', 'vanilla', 'news', 'launcher')
  */
-export async function loadChangelogHistory(profileId = window.__activeBuildProfileId) {
+export function setChangelogFilter(filter) {
+    currentChangelogFilter = filter;
+    const chips = document.querySelectorAll('.changelog-filter-chip');
+    chips.forEach(chip => {
+        chip.classList.toggle('active', chip.dataset.filter === filter);
+    });
+    renderChangelogList();
+}
+
+/**
+ * Инициализация интерактивных чипсов фильтрации ленты
+ */
+export function initChangelogFilters() {
+    const filtersBar = dom.get('changelog-filters');
+    if (!filtersBar || filtersBar._hasFilterListener) return;
+    filtersBar._hasFilterListener = true;
+
+    filtersBar.addEventListener('click', (e) => {
+        const chip = e.target.closest('.changelog-filter-chip');
+        if (!chip) return;
+        const filter = chip.dataset.filter || 'all';
+        setChangelogFilter(filter);
+    });
+}
+
+/**
+ * Загрузить историю изменений манифеста всех сборок, релизов лаунчера и новостей
+ */
+export async function loadChangelogHistory() {
     try {
-        const promises = [];
-        if (window.api && window.api.getManifestHistory) {
-            promises.push(window.api.getManifestHistory(profileId).catch(() => ({ success: false, history: [] })));
-        } else {
-            promises.push(Promise.resolve({ success: false, history: [] }));
+        let profiles = [];
+        if (window.api && window.api.getBuildProfiles) {
+            try {
+                profiles = await window.api.getBuildProfiles();
+            } catch (_) { }
+        }
+        if (!Array.isArray(profiles) || profiles.length === 0) {
+            profiles = [
+                { id: 'ganj4craft5', name: 'ThaumParty', shortName: 'ThaumParty' },
+                { id: 'vanilla', name: 'GanjaCraft Vanilla', shortName: 'Vanilla' }
+            ];
         }
 
-        if (window.api && window.api.getLauncherReleases) {
-            promises.push(window.api.getLauncherReleases().catch(() => ({ success: false, releases: [] })));
-        } else {
-            promises.push(Promise.resolve({ success: false, releases: [] }));
+        const profileHistoryPromises = profiles.map(profile => {
+            if (window.api && window.api.getManifestHistory) {
+                return window.api.getManifestHistory(profile.id)
+                    .then(res => ({ profile, res }))
+                    .catch(() => ({ profile, res: { success: false, history: [] } }));
+            }
+            return Promise.resolve({ profile, res: { success: false, history: [] } });
+        });
+
+        const launcherPromise = (window.api && window.api.getLauncherReleases)
+            ? window.api.getLauncherReleases().catch(() => ({ success: false, releases: [] }))
+            : Promise.resolve({ success: false, releases: [] });
+
+        const newsPromise = (window.api && window.api.getNews)
+            ? window.api.getNews().catch(() => ({ success: false, news: [] }))
+            : Promise.resolve({ success: false, news: [] });
+
+        const [historyResults, launcherRes, newsRes] = await Promise.all([
+            Promise.all(profileHistoryPromises),
+            launcherPromise,
+            newsPromise
+        ]);
+
+        const mergedPackHistory = [];
+        for (const { profile, res } of historyResults) {
+            if (res && res.success && Array.isArray(res.history)) {
+                for (const item of res.history) {
+                    mergedPackHistory.push({
+                        ...item,
+                        profileId: item.profile_id || profile.id,
+                        profileName: profile.name || profile.shortName || profile.id,
+                        profileShortName: profile.shortName || profile.name || profile.id
+                    });
+                }
+            }
         }
 
-        if (window.api && window.api.getNews) {
-            promises.push(window.api.getNews().catch(() => ({ success: false, news: [] })));
-        } else {
-            promises.push(Promise.resolve({ success: false, news: [] }));
-        }
+        // Сортировка всех обновлений сборок по времени (от новых к старым)
+        mergedPackHistory.sort((a, b) => {
+            const timeA = a.timestamp ? Number(a.timestamp) : (a.date ? new Date(a.date).getTime() / 1000 : 0);
+            const timeB = b.timestamp ? Number(b.timestamp) : (b.date ? new Date(b.date).getTime() / 1000 : 0);
+            return timeB - timeA;
+        });
 
-        const [packRes, launcherRes, newsRes] = await Promise.all(promises);
-
-        if (packRes && packRes.success && Array.isArray(packRes.history)) {
-            cachedPackHistory = packRes.history;
-        }
+        cachedPackHistory = mergedPackHistory;
 
         if (launcherRes && launcherRes.success && Array.isArray(launcherRes.releases)) {
             cachedLauncherReleases = launcherRes.releases;
@@ -176,6 +240,7 @@ export async function loadChangelogHistory(profileId = window.__activeBuildProfi
             cachedNews = newsRes.news;
         }
 
+        initChangelogFilters();
         checkChangelogBadge();
         renderChangelogList();
     } catch (e) {
@@ -279,18 +344,38 @@ export function renderChangelogList(containerId = 'changelog-list') {
     // Сортировка по времени (сначала самые свежие)
     allItems.sort((a, b) => b.timestamp - a.timestamp);
 
-    if (allItems.length === 0) {
-        renderEmptyState('История обновлений и новостей пока пуста', containerId);
+    let filteredItems = allItems;
+    if (currentChangelogFilter === 'launcher') {
+        filteredItems = allItems.filter(item => item.itemType === 'launcher');
+    } else if (currentChangelogFilter === 'news') {
+        filteredItems = allItems.filter(item => item.itemType === 'news');
+    } else if (currentChangelogFilter === 'ganj4craft5') {
+        filteredItems = allItems.filter(item => item.itemType === 'pack' && (item.data.profileId === 'ganj4craft5' || !item.data.profileId));
+    } else if (currentChangelogFilter === 'vanilla') {
+        filteredItems = allItems.filter(item => item.itemType === 'pack' && item.data.profileId === 'vanilla');
+    }
+
+    if (filteredItems.length === 0) {
+        const emptyMsg = currentChangelogFilter === 'all'
+            ? 'История обновлений и новостей пока пуста'
+            : 'В выбранной категории пока нет записей';
+        renderEmptyState(emptyMsg, containerId);
         return;
     }
 
     container.innerHTML = '';
 
-    allItems.forEach((entry, idx) => {
+    filteredItems.forEach((entry, idx) => {
         const card = document.createElement('div');
         let themeClass = 'card-theme-pack';
-        if (entry.itemType === 'launcher') themeClass = 'card-theme-launcher';
-        else if (entry.itemType === 'news') themeClass = 'card-theme-news';
+        if (entry.itemType === 'launcher') {
+            themeClass = 'card-theme-launcher';
+        } else if (entry.itemType === 'news') {
+            themeClass = 'card-theme-news';
+        } else if (entry.itemType === 'pack') {
+            if (entry.data.profileId === 'ganj4craft5') themeClass = 'card-theme-thaumparty';
+            else if (entry.data.profileId === 'vanilla') themeClass = 'card-theme-vanilla';
+        }
 
         card.className = `changelog-release-card ${themeClass}`;
 
@@ -570,6 +655,14 @@ function renderPackCardHtml(item, isLatest) {
     if (totalRemoved > 0) summaryPills.push(`<span class="changelog-pill pill-remove">➖ ${totalRemoved}</span>`);
     if (configsCount > 0) summaryPills.push(`<span class="changelog-pill pill-config">⚙️ ${configsCount}</span>`);
 
+    const profileId = item.profileId || item.profile_id || 'ganj4craft5';
+    let profileName = item.profileName || item.profileShortName;
+    if (!profileName) {
+        profileName = (profileId === 'ganj4craft5') ? 'ThaumParty' : (profileId === 'vanilla' ? 'Vanilla' : profileId);
+    }
+    const profileTagClass = (profileId === 'ganj4craft5') ? 'changelog-badge-scope-thaumparty' : 'changelog-badge-scope-vanilla';
+    const profileIcon = (profileId === 'ganj4craft5') ? '🎮' : '🍦';
+
     const headerHtml = `
         <div class="changelog-release-header">
             <div class="changelog-header-left">
@@ -580,7 +673,7 @@ function renderPackCardHtml(item, isLatest) {
                     <line x1="3" y1="10" x2="21" y2="10"/>
                 </svg>
                 <h4>${escapeHtml(formattedDate)}</h4>
-                <span class="changelog-badge-tag changelog-badge-scope-pack">🎮 СБОРКА</span>
+                <span class="changelog-badge-tag ${profileTagClass}">${profileIcon} ${escapeHtml(profileName)}</span>
                 ${isLatest ? '<span class="changelog-badge-latest">СВЕЖЕЕ</span>' : ''}
                 ${versionStr ? `<span class="changelog-badge-ver">${escapeHtml(versionStr)}</span>` : ''}
             </div>
@@ -834,6 +927,7 @@ let changelogAnimating = false;
  */
 export function openChangelogScreen() {
     openSettings('changelog');
+    markChangelogSeen();
 }
 
 /**
@@ -857,11 +951,13 @@ export function toggleChangelogScreen() {
         const activeTabBtn = document.querySelector('#settings-tabs-bar .tab-btn.active');
         if (activeTabBtn && activeTabBtn.dataset.tab !== 'changelog') {
             switchTab('changelog');
+            markChangelogSeen();
         } else {
             closeSettings();
         }
     } else {
         openSettings('changelog');
+        markChangelogSeen();
     }
 }
 
@@ -897,6 +993,8 @@ export function initChangelog() {
             closeSettings();
         }
     });
+
+    initChangelogFilters();
 
     // Фоновая загрузка истории
     loadChangelogHistory();

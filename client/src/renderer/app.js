@@ -373,7 +373,6 @@ async function init() {
             captureInitialSettingsState();
             await loadModsList(profileConfig.disabledMods || [], currentConfig, true);
             await loadConfigsList(profileId);
-            await loadChangelogHistory(profileId);
         } catch (error) {
             console.error('[Profile] Failed to reload profile data:', error);
         } finally {
@@ -384,7 +383,7 @@ async function init() {
     updateLoaderStatus(90, 'Загрузка обновлений и статуса серверов...');
     // Start network work after the interactive shell is visible; it must not block first paint.
     requestAnimationFrame(() => {
-        loadChangelogHistory(window.__activeBuildProfileId).catch(error => console.warn('[CHANGELOG] Deferred load failed:', error));
+        loadChangelogHistory().catch(error => console.warn('[CHANGELOG] Deferred load failed:', error));
         startStatusChecker();
     });
 

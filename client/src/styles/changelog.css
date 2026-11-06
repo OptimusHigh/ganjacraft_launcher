@@ -8,9 +8,71 @@
 
 /* ── Scope Badges ── */
 .changelog-badge-scope-pack { font-size: var(--gc-font-xs); font-weight: 700; color: #69f0ae; background: rgba(var(--gc-accent-rgb), 0.14); border: 1px solid rgba(var(--gc-accent-rgb), 0.4); padding: 2px 7px; border-radius: var(--gc-radius-xs); letter-spacing: 0.4px; }
+.changelog-badge-scope-thaumparty { font-size: var(--gc-font-xs); font-weight: 700; color: #e040fb; background: rgba(224, 64, 251, 0.15); border: 1px solid rgba(224, 64, 251, 0.45); padding: 2px 7px; border-radius: var(--gc-radius-xs); letter-spacing: 0.4px; }
+.changelog-badge-scope-vanilla { font-size: var(--gc-font-xs); font-weight: 700; color: #69f0ae; background: rgba(var(--gc-accent-rgb), 0.14); border: 1px solid rgba(var(--gc-accent-rgb), 0.4); padding: 2px 7px; border-radius: var(--gc-radius-xs); letter-spacing: 0.4px; }
 .changelog-badge-scope-launcher { font-size: var(--gc-font-xs); font-weight: 700; color: var(--gc-purple-pastel); background: rgba(var(--gc-purple-deep-rgb), 0.15); border: 1px solid rgba(var(--gc-purple-deep-rgb), 0.45); padding: 2px 7px; border-radius: var(--gc-radius-xs); letter-spacing: 0.4px; }
 .changelog-badge-scope-news { font-size: var(--gc-font-xs); font-weight: 700; color: var(--gc-cyan); background: rgba(var(--gc-cyan-rgb), 0.12); border: 1px solid rgba(var(--gc-cyan-rgb), 0.4); padding: 2px 7px; border-radius: var(--gc-radius-xs); letter-spacing: 0.4px; }
 .changelog-badge-ver.ver-launcher { color: #e1bee7; background: rgba(var(--gc-purple-rgb), 0.15); border: 1px solid rgba(var(--gc-purple-rgb), 0.35); }
+
+/* ── Filter Chips Bar ── */
+.changelog-filters-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+    flex-shrink: 0;
+    overflow-x: auto;
+    padding-bottom: 2px;
+}
+.changelog-filters-bar::-webkit-scrollbar { height: 4px; }
+.changelog-filters-bar::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 2px; }
+
+.changelog-filter-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: var(--gc-text-secondary);
+    padding: 6px 14px;
+    border-radius: 9999px;
+    font-size: var(--gc-font-sm);
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    white-space: nowrap;
+    user-select: none;
+}
+.changelog-filter-chip:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--gc-text-primary);
+    border-color: rgba(255, 255, 255, 0.18);
+    transform: translateY(-1px);
+}
+.changelog-filter-chip.active {
+    background: rgba(var(--gc-accent-rgb), 0.18);
+    color: #69f0ae;
+    border-color: rgba(var(--gc-accent-rgb), 0.5);
+    box-shadow: 0 0 12px rgba(var(--gc-accent-rgb), 0.25);
+}
+.changelog-filter-chip[data-filter="ganj4craft5"].active {
+    background: rgba(224, 64, 251, 0.18);
+    color: #e040fb;
+    border-color: rgba(224, 64, 251, 0.5);
+    box-shadow: 0 0 12px rgba(224, 64, 251, 0.25);
+}
+.changelog-filter-chip[data-filter="launcher"].active {
+    background: rgba(var(--gc-purple-deep-rgb), 0.2);
+    color: var(--gc-purple-pastel);
+    border-color: rgba(var(--gc-purple-deep-rgb), 0.5);
+    box-shadow: 0 0 12px rgba(var(--gc-purple-deep-rgb), 0.25);
+}
+.changelog-filter-chip[data-filter="news"].active {
+    background: rgba(var(--gc-cyan-rgb), 0.18);
+    color: var(--gc-cyan);
+    border-color: rgba(var(--gc-cyan-rgb), 0.5);
+    box-shadow: 0 0 12px rgba(var(--gc-cyan-rgb), 0.25);
+}
 
 /* Admin custom note — launcher variant */
 .changelog-admin-note.launcher-note { background: linear-gradient(135deg, rgba(var(--gc-purple-deep-rgb), 0.08) 0%, rgba(26, 20, 36, 0.45) 100%); border-left-color: var(--gc-purple-pastel); border-top-color: rgba(var(--gc-purple-deep-rgb), 0.2); border-right-color: rgba(var(--gc-purple-deep-rgb), 0.2); border-bottom-color: rgba(var(--gc-purple-deep-rgb), 0.2); }
@@ -75,6 +137,10 @@
 .changelog-release-card.card-theme-launcher:hover { border-color: rgba(179, 136, 255, 0.5); box-shadow: 0 12px 36px rgba(0, 0, 0, 0.6), 0 0 20px rgba(var(--gc-purple-deep-rgb), 0.12), inset 0 1px 1px rgba(255, 255, 255, 0.2); }
 .changelog-release-card.card-theme-news { border-color: rgba(var(--gc-cyan-rgb), 0.25); background: linear-gradient(135deg, rgba(14, 26, 36, 0.94) 0%, rgba(8, 14, 20, 0.98) 100%); }
 .changelog-release-card.card-theme-news:hover { border-color: rgba(var(--gc-cyan-rgb), 0.5); box-shadow: 0 12px 36px rgba(0, 0, 0, 0.6), 0 0 20px rgba(var(--gc-cyan-rgb), 0.14), inset 0 1px 1px rgba(255, 255, 255, 0.2); }
+.changelog-release-card.card-theme-thaumparty { border-color: rgba(186, 104, 200, 0.25); background: linear-gradient(135deg, rgba(28, 18, 36, 0.94) 0%, rgba(14, 10, 18, 0.98) 100%); }
+.changelog-release-card.card-theme-thaumparty:hover { border-color: rgba(224, 64, 251, 0.5); box-shadow: 0 12px 36px rgba(0, 0, 0, 0.6), 0 0 20px rgba(224, 64, 251, 0.15), inset 0 1px 1px rgba(255, 255, 255, 0.2); }
+.changelog-release-card.card-theme-vanilla { border-color: rgba(var(--gc-accent-rgb), 0.22); background: linear-gradient(135deg, rgba(16, 28, 22, 0.94) 0%, rgba(10, 18, 14, 0.98) 100%); }
+.changelog-release-card.card-theme-vanilla:hover { border-color: rgba(var(--gc-accent-rgb), 0.5); box-shadow: 0 12px 36px rgba(0, 0, 0, 0.6), 0 0 20px rgba(var(--gc-accent-rgb), 0.15), inset 0 1px 1px rgba(255, 255, 255, 0.2); }
 .changelog-release-card.card-theme-pack:hover { border-color: var(--gc-border-hover); box-shadow: 0 12px 36px rgba(0, 0, 0, 0.6), 0 0 20px rgba(var(--gc-green-rgb), 0.08), inset 0 1px 1px rgba(255, 255, 255, 0.2); }
 
 /* Release Card Header */
