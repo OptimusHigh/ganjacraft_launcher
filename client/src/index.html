@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link
-        href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&family=Pixelify+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap"
+        href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap"
         rel="stylesheet">
     <!-- Design System — Modular CSS -->
     <link rel="stylesheet" href="styles/tokens.css">
@@ -704,30 +704,60 @@
 
                     <!-- Server presence remains available without competing with launch controls -->
                     <div class="launch-action-hub">
-                        <div class="server-live-card-modern empty-card">
-                            <!-- Multi-server live status list -->
+                        <div class="server-live-card-modern" id="server-live-card">
+                            <!-- Multi-server live status list as spoilers -->
                             <div class="servers-status-list" id="servers-status-list">
-                                <div class="server-status-item" id="server-status-vanilla" data-server="vanilla">
-                                    <div class="server-status-header">
-                                        <span class="status-indicator-dot online"></span>
-                                        <span class="server-status-title">VANILLA:</span>
+                                <!-- Vanilla Server Spoiler -->
+                                <div class="server-spoiler-card" id="server-card-vanilla" data-server="vanilla">
+                                    <div class="server-spoiler-header" id="server-status-vanilla" data-server="vanilla" role="button" tabindex="0" title="Нажмите, чтобы развернуть онлайн">
+                                        <div class="server-spoiler-title-wrap">
+                                            <span class="status-indicator-dot online"></span>
+                                            <span class="server-status-title">VANILLA</span>
+                                        </div>
+                                        <div class="server-spoiler-meta">
+                                            <span class="server-status-count" id="count-vanilla">0 / 20</span>
+                                            <svg class="server-spoiler-arrow" viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+                                                <path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/>
+                                            </svg>
+                                        </div>
                                     </div>
-                                    <span class="server-status-count" id="count-vanilla">0 / 20</span>
+                                    <div class="server-spoiler-body" id="spoiler-body-vanilla">
+                                        <div class="server-spoiler-info">
+                                            <span class="server-spoiler-host-badge" id="host-vanilla" title="Адрес сервера">vocalize-cove.gl.joinmc.link</span>
+                                        </div>
+                                        <div class="server-players-live-list" id="players-list-vanilla">
+                                            <div class="server-empty-hint">Нет игроков в сети</div>
+                                        </div>
+                                    </div>
                                 </div>
-                                <div class="server-status-item" id="server-status-ganj4craft5" data-server="ganj4craft5">
-                                    <div class="server-status-header">
-                                        <span class="status-indicator-dot online"></span>
-                                        <span class="server-status-title">THAUMPARTY:</span>
+
+                                <!-- ThaumParty (ganj4craft5) Server Spoiler -->
+                                <div class="server-spoiler-card" id="server-card-ganj4craft5" data-server="ganj4craft5">
+                                    <div class="server-spoiler-header" id="server-status-ganj4craft5" data-server="ganj4craft5" role="button" tabindex="0" title="Нажмите, чтобы развернуть онлайн">
+                                        <div class="server-spoiler-title-wrap">
+                                            <span class="status-indicator-dot online"></span>
+                                            <span class="server-status-title">THAUMPARTY</span>
+                                        </div>
+                                        <div class="server-spoiler-meta">
+                                            <span class="server-status-count" id="count-ganj4craft5">0 / 20</span>
+                                            <svg class="server-spoiler-arrow" viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+                                                <path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/>
+                                            </svg>
+                                        </div>
                                     </div>
-                                    <span class="server-status-count" id="count-ganj4craft5">0 / 20</span>
+                                    <div class="server-spoiler-body" id="spoiler-body-ganj4craft5">
+                                        <div class="server-spoiler-info">
+                                            <span class="server-spoiler-host-badge" id="host-ganj4craft5" title="Адрес сервера">vocalize-cove.gl.joinmc.link:25578</span>
+                                        </div>
+                                        <div class="server-players-live-list" id="players-list-ganj4craft5">
+                                            <div class="server-empty-hint">Нет игроков в сети</div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
 
-                            <!-- Clean divider (visible when players online) -->
-                            <div class="server-card-divider"></div>
-
-                            <!-- Player list (populated with avatar badges when players online) -->
-                            <div class="server-players-live-list" id="live-players-container"></div>
+                            <!-- Legacy container fallback -->
+                            <div class="hidden" id="live-players-container"></div>
                         </div>
                     </div>
                 </div>

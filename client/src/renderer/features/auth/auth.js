@@ -189,6 +189,39 @@ function showLoginScreen() {
     if (usernameInput) usernameInput.focus();
 }
 
+function renderPlayerProfileStats(player) {
+    if (!player) player = window.__cachedPlayerData;
+    if (!player) return;
+
+    const currentProfile = window.__activeBuildProfileId || (window.ProfileManager ? window.ProfileManager.getActiveProfileId() : 'ganj4craft5');
+    const profileKey = (currentProfile === 'vanilla' || currentProfile === 'minecraft-vanilla') ? 'vanilla' : 'ganj4craft5';
+
+    const coinsEl = dom.get('stat-coins');
+    const playtimeEl = dom.get('stat-playtime');
+    const serverStats = player.servers && player.servers[profileKey];
+
+    let emcVal = player.emc;
+    let hoursVal = player.season_hours || player.total_hours || (player.season_playtime_minutes ? (player.season_playtime_minutes / 60).toFixed(1) : '0');
+
+    if (serverStats) {
+        if (serverStats.emc != null && (serverStats.emc > 0 || profileKey === 'vanilla')) {
+            emcVal = serverStats.emc;
+        } else if (profileKey === 'ganj4craft5' && player.emc != null) {
+            emcVal = player.emc;
+        }
+        if (serverStats.hours != null && serverStats.hours > 0) {
+            hoursVal = serverStats.hours;
+        }
+    }
+
+    if (coinsEl) coinsEl.textContent = (emcVal != null ? Number(emcVal).toLocaleString('ru-RU') : '0');
+    if (playtimeEl) playtimeEl.textContent = `${hoursVal} ч`;
+}
+
+window.addEventListener('build-profile-changed', () => {
+    renderPlayerProfileStats();
+});
+
 export async function loadPlayerStats(username) {
     if (!username) return;
 
@@ -219,9 +252,8 @@ export async function loadPlayerStats(username) {
                         const rankSlug = rankClean.toLowerCase().replace(/\s+/g, '-');
                         rankBadgeEl.className = `player-rank-pill minecraft-rank-badge rank-${rankSlug}`;
                     }
-                    if (coinsEl) coinsEl.textContent = (player.emc != null ? Number(player.emc).toLocaleString('ru-RU') : '0');
-                    const hours = player.season_hours || player.total_hours || (player.season_playtime_minutes ? (player.season_playtime_minutes / 60).toFixed(1) : '0');
-                    if (playtimeEl) playtimeEl.textContent = `${hours} ч`;
+                    window.__cachedPlayerData = player;
+                    renderPlayerProfileStats(player);
                     return;
                 }
             }
