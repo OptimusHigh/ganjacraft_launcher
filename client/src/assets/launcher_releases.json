@@ -1,5 +1,21 @@
 [
   {
+    "version": "1.0.189",
+    "date": "2026-11-07T11:06:01.209Z",
+    "timestamp": 1794049561,
+    "title": "Релиз v1.0.189",
+    "description": "GANJ4CRAFT 5: ВАНИЛЬНЫЙ И ТАУМКРАФТ СЕРВЕРА ТЕПЕРЬ ДОСТУПНЫ ДЛЯ ИГРЫ",
+    "changes": [
+      "🐛 Dynamic per-server ranks in player profile and rank styles",
+      "🐛 Display live per-server EMC balance from API",
+      "🐛 Correct profile-specific EMC balance for Vanilla and ThaumParty",
+      "✨ Initialize client launcher UI structure, main process, and core renderer features",
+      "✨ Add client assets, HTML skeleton, server status widget, and mod classifier script",
+      "✨ Bind player emc and playtime to active server profile and render dual status",
+      "✨ Add launcher frontend UI, modular features, and mod classifier script"
+    ]
+  },
+  {
     "version": "1.0.188",
     "date": "2026-11-07T11:02:44.856Z",
     "timestamp": 1794049364,
