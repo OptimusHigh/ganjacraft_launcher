@@ -246,10 +246,35 @@
     text-shadow: 2px 2px 0px #3f153f, 2px 2px 0px rgba(0, 0, 0, 0.9);
 }
 
+.minecraft-nametag .rank-elite,
+.minecraft-nametag .rank-элита {
+    color: #d055ff;
+    text-shadow: 2px 2px 0px #35153f, 2px 2px 0px rgba(0, 0, 0, 0.9);
+}
+
+.minecraft-nametag .rank-pro,
+.minecraft-nametag .rank-про {
+    color: #ffaa00;
+    text-shadow: 2px 2px 0px #3f2a00, 2px 2px 0px rgba(0, 0, 0, 0.9);
+}
+
+.minecraft-nametag .rank-veteran,
+.minecraft-nametag .rank-ветеран {
+    color: #ffff55;
+    text-shadow: 2px 2px 0px #3f3f15, 2px 2px 0px rgba(0, 0, 0, 0.9);
+}
+
 .minecraft-nametag .rank-player,
 .minecraft-nametag .rank-игрок {
     color: #55ff55;
     text-shadow: 2px 2px 0px #153f15, 2px 2px 0px rgba(0, 0, 0, 0.9);
+}
+
+.minecraft-nametag .rank-noob,
+.minecraft-nametag .rank-нуб,
+.minecraft-nametag .rank-новичок {
+    color: #aaaaaa;
+    text-shadow: 2px 2px 0px #2a2a2a, 2px 2px 0px rgba(0, 0, 0, 0.9);
 }
 
 .skin-viewer-wrapper.frameless-skin {

@@ -198,6 +198,7 @@ function renderPlayerProfileStats(player) {
 
     const coinsEl = dom.get('stat-coins');
     const playtimeEl = dom.get('stat-playtime');
+    const rankBadgeEl = dom.get('player-rank-badge');
     const serverStats = player.servers && player.servers[profileKey];
 
     const emcVal = (serverStats && serverStats.emc != null) ? serverStats.emc : 0;
@@ -205,6 +206,14 @@ function renderPlayerProfileStats(player) {
 
     if (coinsEl) coinsEl.textContent = Number(emcVal || 0).toLocaleString('ru-RU');
     if (playtimeEl) playtimeEl.textContent = `${hoursVal} ч`;
+
+    if (rankBadgeEl) {
+        const rawRank = (serverStats && serverStats.rank_name) ? serverStats.rank_name : (player.rank_name || 'Новичок');
+        const rankClean = rawRank.replace(/[\[\]]/g, '').trim();
+        rankBadgeEl.textContent = `[${rankClean}]`;
+        const rankCode = (serverStats && serverStats.rank) ? serverStats.rank.toLowerCase() : rankClean.toLowerCase().replace(/\s+/g, '-');
+        rankBadgeEl.className = `player-rank-pill minecraft-rank-badge rank-${rankCode}`;
+    }
 }
 
 window.addEventListener('build-profile-changed', () => {
@@ -234,13 +243,6 @@ export async function loadPlayerStats(username) {
             if (data.success && Array.isArray(data.players)) {
                 const player = data.players.find(p => p.nick && p.nick.toLowerCase() === username.toLowerCase());
                 if (player) {
-                    if (rankBadgeEl) {
-                        const rawRank = player.rank_name || 'Игрок';
-                        const rankClean = rawRank.replace(/[\[\]]/g, '').trim();
-                        rankBadgeEl.textContent = `[${rankClean}]`;
-                        const rankSlug = rankClean.toLowerCase().replace(/\s+/g, '-');
-                        rankBadgeEl.className = `player-rank-pill minecraft-rank-badge rank-${rankSlug}`;
-                    }
                     window.__cachedPlayerData = player;
                     renderPlayerProfileStats(player);
                     return;
@@ -252,8 +254,8 @@ export async function loadPlayerStats(username) {
     }
 
     if (rankBadgeEl) {
-        rankBadgeEl.textContent = '[Игрок]';
-        rankBadgeEl.className = 'player-rank-pill minecraft-rank-badge rank-player';
+        rankBadgeEl.textContent = '[Новичок]';
+        rankBadgeEl.className = 'player-rank-pill minecraft-rank-badge rank-noob';
     }
     if (coinsEl) coinsEl.textContent = '0';
     if (playtimeEl) playtimeEl.textContent = '0 ч';
