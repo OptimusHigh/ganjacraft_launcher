@@ -200,21 +200,20 @@ function renderPlayerProfileStats(player) {
     const playtimeEl = dom.get('stat-playtime');
     const serverStats = player.servers && player.servers[profileKey];
 
-    let emcVal = player.emc;
-    let hoursVal = player.season_hours || player.total_hours || (player.season_playtime_minutes ? (player.season_playtime_minutes / 60).toFixed(1) : '0');
+    let emcVal = 0;
+    let hoursVal = '0';
 
-    if (serverStats) {
-        if (serverStats.emc != null && (serverStats.emc > 0 || profileKey === 'vanilla')) {
-            emcVal = serverStats.emc;
-        } else if (profileKey === 'ganj4craft5' && player.emc != null) {
-            emcVal = player.emc;
-        }
-        if (serverStats.hours != null && serverStats.hours > 0) {
-            hoursVal = serverStats.hours;
-        }
+    if (profileKey === 'vanilla') {
+        // На Vanilla отображается исторический / общий баланс EMC игрока
+        emcVal = (serverStats && serverStats.emc > 0) ? serverStats.emc : (player.emc != null ? player.emc : 0);
+        hoursVal = (serverStats && serverStats.hours != null) ? serverStats.hours : (player.season_hours || '0');
+    } else {
+        // На ThaumParty (ganj4craft5) отображается реальный текущий баланс 5 сезона (без утечки старых миллионов)
+        emcVal = (serverStats && serverStats.emc != null) ? serverStats.emc : 0;
+        hoursVal = (serverStats && serverStats.hours != null) ? serverStats.hours : '0';
     }
 
-    if (coinsEl) coinsEl.textContent = (emcVal != null ? Number(emcVal).toLocaleString('ru-RU') : '0');
+    if (coinsEl) coinsEl.textContent = Number(emcVal || 0).toLocaleString('ru-RU');
     if (playtimeEl) playtimeEl.textContent = `${hoursVal} ч`;
 }
 
