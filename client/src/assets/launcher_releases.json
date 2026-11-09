@@ -1,5 +1,21 @@
 [
   {
+    "version": "1.0.190",
+    "date": "2026-11-09T22:14:20.832Z",
+    "timestamp": 1794262460,
+    "title": "Релиз v1.0.190",
+    "description": "Фикс поставки клиентам преднастроенных конфигов",
+    "changes": [
+      "🐛 Add client_config to serverControlled and implement cleanup",
+      "🐛 Dynamic per-server ranks in player profile and rank styles",
+      "🐛 Display live per-server EMC balance from API",
+      "🐛 Correct profile-specific EMC balance for Vanilla and ThaumParty",
+      "✨ Initialize client launcher UI structure, main process, and core renderer features",
+      "✨ Add client assets, HTML skeleton, server status widget, and mod classifier script",
+      "✨ Bind player emc and playtime to active server profile and render dual status"
+    ]
+  },
+  {
     "version": "1.0.189",
     "date": "2026-11-07T11:06:01.209Z",
     "timestamp": 1794049561,
