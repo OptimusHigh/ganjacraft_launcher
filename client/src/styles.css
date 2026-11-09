@@ -960,7 +960,7 @@ body.is-admin .unified-toolbar-label.admin-only {
 #notification-container {
     position: fixed;
     bottom: 20px;
-    right: 20px;
+    left: 20px;
     z-index: 2000;
     /* Highest priority */
     display: flex;
@@ -980,7 +980,7 @@ body.is-admin .unified-toolbar-label.admin-only {
     color: #fff;
     font-size: 13px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
-    transform: translateX(120%);
+    transform: translateX(-120%);
     transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.3s ease;
     pointer-events: auto;
     display: flex;
