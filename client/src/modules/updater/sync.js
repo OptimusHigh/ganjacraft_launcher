@@ -14,6 +14,7 @@ const { cleanupAll } = require('./cleanup');
 const FILE_CATEGORIES = {
     // Сервер-контролируемые файлы — всегда обновляются
     serverControlled: [
+        'client_config/',
         'fancymenu_data/',
         'config/fancymenu/',
         'config/fancymenu-',

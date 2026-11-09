@@ -62,7 +62,7 @@ async function syncCategory(rootPath, manifestUrl, category, options = {}) {
             files = manifest.files.filter(f => f.path.startsWith('mods/') && f.path.endsWith('.jar'));
             break;
         case 'config':
-            files = manifest.files.filter(f => f.path.startsWith('config/'));
+            files = manifest.files.filter(f => f.path.startsWith('config/') || f.path.startsWith('client_config/'));
             break;
         case 'kubejs':
             files = manifest.files.filter(f => {
@@ -301,7 +301,7 @@ async function getCategoryCounts(rootPath, manifestUrl) {
                 counts.mods.manifest++;
                 counts.mods.size += size;
             }
-            else if (f.path.startsWith('config/')) {
+            else if (f.path.startsWith('config/') || f.path.startsWith('client_config/')) {
                 counts.config.manifest++;
                 counts.config.size += size;
             }

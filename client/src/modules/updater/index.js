@@ -23,6 +23,7 @@ const {
     cleanupThingpacks,
     cleanupResourcepacks,
     cleanupFancymenu,
+    cleanupClientConfig,
     cleanupAll
 } = require('./cleanup');
 
@@ -61,5 +62,6 @@ module.exports = {
     cleanupThingpacks,
     cleanupResourcepacks,
     cleanupFancymenu,
+    cleanupClientConfig,
     cleanupAll
 };

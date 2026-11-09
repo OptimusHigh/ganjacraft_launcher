@@ -202,6 +202,22 @@ function cleanupFancymenu(rootPath, manifest, sendLog = () => {}) {
 }
 
 /**
+ * Очистка клиентских настроек
+ */
+function cleanupClientConfig(rootPath, manifest, sendLog = () => {}) {
+    const clientConfigDir = path.join(rootPath, 'client_config');
+    if (!fs.existsSync(clientConfigDir)) return;
+
+    const manifestClientConfig = new Set(
+        manifest.files
+            .filter(f => f.path.startsWith('client_config/'))
+            .map(f => path.normalize(f.path))
+    );
+
+    cleanDirectory(clientConfigDir, 'client_config', manifestClientConfig, sendLog);
+}
+
+/**
  * Выполнить полную очистку всех категорий
  */
 function cleanupAll(rootPath, manifest, disabledMods = [], sendLog = () => {}) {
@@ -210,6 +226,7 @@ function cleanupAll(rootPath, manifest, disabledMods = [], sendLog = () => {}) {
     cleanupThingpacks(rootPath, manifest, sendLog);
     cleanupResourcepacks(rootPath, manifest, sendLog);
     cleanupFancymenu(rootPath, manifest, sendLog);
+    cleanupClientConfig(rootPath, manifest, sendLog);
 }
 
 module.exports = {
@@ -219,5 +236,6 @@ module.exports = {
     cleanupThingpacks,
     cleanupResourcepacks,
     cleanupFancymenu,
+    cleanupClientConfig,
     cleanupAll
 };
